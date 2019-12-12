@@ -1,0 +1,38 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sharedUserId="android.uid.system"
+    package="com.micronet.dsc.vbs">
+
+    <permission android:name="com.micronet.dsc.vbs.TXRX" android:label="VBus Send/Receive" android:protectionLevel="signature"/>
+
+    <uses-permission android:name="com.micronet.dsc.vbs.TXRX" />
+
+    <application android:allowBackup="true" android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher" android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        
+
+        <service
+            android:name=".VehicleBusService"
+            android:permission="com.micronet.dsc.vbs.TXRX"
+            android:enabled="true"
+            >
+            <intent-filter>
+                <action android:name="com.micronet.dsc.vbs.start" />
+                <action android:name="com.micronet.dsc.vbs.restart" />
+                <action android:name="com.micronet.dsc.vbs.stop" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".VehicleBusAlarmReceiver"
+            android:enabled="true"
+            >
+            <intent-filter>
+                <action android:name="com.micronet.dsc.vbs.alarm" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>
