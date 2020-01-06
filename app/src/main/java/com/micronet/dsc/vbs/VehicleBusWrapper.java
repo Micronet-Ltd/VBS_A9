@@ -497,11 +497,8 @@ public class VehicleBusWrapper extends VehicleBusHW {
         void setDefaultFilters() {
             // create default filters to block all CAN packets that arent all 0s
             hardwareFilters = new CANHardwareFilter[2];
-
-            int[] ids = new int[1];
-            ids[0] = 0;
-            hardwareFilters[0] = new CANHardwareFilter(ids, 0x3FFFFFF, CANFrameType.EXTENDED);
-            hardwareFilters[1] = new CANHardwareFilter(ids, 0x7FF, CANFrameType.STANDARD);
+            hardwareFilters[0] = new CANHardwareFilter(0, 0x3FFFFFF, CANFrameType.EXTENDED);
+            hardwareFilters[1] = new CANHardwareFilter(0, 0x7FF, CANFrameType.STANDARD);
         }
 
 

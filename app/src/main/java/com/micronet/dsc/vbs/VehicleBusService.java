@@ -14,15 +14,20 @@
 
 package com.micronet.dsc.vbs;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.SystemClock;
+import android.support.v4.app.NotificationCompat;
 
 
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class VehicleBusService extends Service {
@@ -31,16 +36,9 @@ public class VehicleBusService extends Service {
 
     public static final int BROADCAST_STATUS_DELAY_MS = 1000; // every 1 s
 
-
-
     // These are the possible buses that are monitored here
     static final int VBUS_CAN = 1;
     static final int VBUS_J1708 = 2;
-
-
-
-
-
 
     int processId = 0;
     boolean hasStartedCAN = false;
@@ -52,8 +50,12 @@ public class VehicleBusService extends Service {
     VehicleBusJ1708 my_j1708;
     VehicleBusCAN my_can;
 
-
     boolean isUnitTesting = false;
+
+    public static final String APP_NAME = "VBS";
+    public static final String VBS_CHANNEL_DESCRIPTION = "VBS description channel.";
+    public static final String VBS_NOTIFICATION_DESCRIPTION = "is running";
+    public static final String CHANNEL_ID = "com.micronet.dsc.vbs_notifications";
 
     public VehicleBusService() {
     }
@@ -72,48 +74,35 @@ public class VehicleBusService extends Service {
         mainHandler  = new Handler();
     }
 
-
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
         String bus;
         String action;
-
-
-
-
         if (intent == null) {
             // load up our saved settings from file and use those
             if (!startFromFile()) return START_NOT_STICKY;
             return START_NOT_STICKY;
         } // intent was null .. load from file
 
-
         action = intent.getAction();
-
         if (action.equals(VehicleBusConstants.SERVICE_ACTION_RESTART)) {
             android.util.Log.i(TAG, "Vehicle Bus Service Restarting");
             if (!startFromFile()) return START_NOT_STICKY;
             return START_NOT_STICKY;
-
         }
 
-
         bus = intent.getStringExtra(VehicleBusConstants.SERVICE_EXTRA_BUS);
-
         if (bus == null) {
             Log.e(TAG, "cannot start/stop service. must designate bus");
             return START_NOT_STICKY;
         }
 
-
-
         if (action.equals(VehicleBusConstants.SERVICE_ACTION_START)) {
             android.util.Log.i(TAG, "Vehicle Bus Service Starting: " + bus);
-
+            setForeground();
 
             // if bus is J1708, then filter out all CAN messages so we don't get any before starting.
-
             if (bus.equals("J1708")) {
                 // remember that this was our last request
                 saveJ1708(true);
@@ -138,9 +127,7 @@ public class VehicleBusService extends Service {
                 startCAN(bitrate, skip_verify, auto_detect, ids, masks, false);
             }
 
-
-        } else
-        if (action.equals(VehicleBusConstants.SERVICE_ACTION_STOP)) {
+        } else if (action.equals(VehicleBusConstants.SERVICE_ACTION_STOP)) {
             android.util.Log.i(TAG, "Vehicle Bus Service Stopped: " + bus);
 
             // ignore J1708 requests for now, J1708 is stopped same time as CAN
@@ -148,6 +135,7 @@ public class VehicleBusService extends Service {
 
                 saveCAN(false, 0, false, null, null);
                 if (!isAnythingElseOn(VBUS_CAN)) {
+                    setBackground();
                     stopSelf(); // nothing on, stop everything and exit
                 } else {
                     stopCAN(true); // just stop the CAN
@@ -158,6 +146,7 @@ public class VehicleBusService extends Service {
                 saveJ1708(false);
 
                 if (!isAnythingElseOn(VBUS_J1708)) {
+                    setBackground();
                     stopSelf(); // nothing on, stop everything and exit
                 } else {
                     stopJ1708(true); // just stop the J1708
@@ -184,8 +173,30 @@ public class VehicleBusService extends Service {
 
     } // OnDestroy()
 
+    //////////////////////////////////////////////////////////////////
+    // setForeground()
+    //  move the service to the foreground and display the icon
+    //////////////////////////////////////////////////////////////////
+    void setForeground() {
+        NotificationChannel notificationChannel = new NotificationChannel(CHANNEL_ID, APP_NAME, NotificationManager.IMPORTANCE_DEFAULT);
+        notificationChannel.setDescription(VBS_CHANNEL_DESCRIPTION);
+        NotificationManager notificationManager = getSystemService(NotificationManager.class);
+        notificationManager.createNotificationChannel(notificationChannel);
 
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(APP_NAME)
+                .setContentText(VBS_NOTIFICATION_DESCRIPTION)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(null);
 
+        startForeground(444444, builder.build());
+        Log.d(TAG, "VBS set to foreground.");
+    }
+
+    private void setBackground() {
+        stopForeground(true); // true = remove notification
+    }
 
     ////////////////////////////////////////////////////////////////
     // startFromFile()
@@ -518,7 +529,7 @@ public class VehicleBusService extends Service {
 
         for (int i = 0; i < masks.length && i < ids.length; i++) {
             canHardwareFilters[i] =
-                 new VehicleBusWrapper.CANHardwareFilter(new int[] {ids[i]},masks[i], VehicleBusWrapper.CANFrameType.EXTENDED);
+                 new VehicleBusWrapper.CANHardwareFilter(ids[i], masks[i], VehicleBusWrapper.CANFrameType.EXTENDED);
         }
 
         return canHardwareFilters;
@@ -566,7 +577,7 @@ public class VehicleBusService extends Service {
     ///////////////////////////////////////////////////////////////
     // statusTask()
     //  Timer to broadcast that we are still alive
-    ///////////////////////////////////////////////////////////////
+    ///////////////////////////// //////////////////////////////////
     private Runnable statusTask = new Runnable() {
 
         int count = 0;
