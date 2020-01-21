@@ -6,6 +6,7 @@ package com.micronet.dsc.vbs;
 
 import com.micronet.canbus.CanbusFilter;
 import com.micronet.canbus.CanbusFlowControl;
+import com.micronet.canbus.CanbusFrameType;
 import com.micronet.canbus.CanbusInterface;
 import com.micronet.canbus.CanbusSocket;
 
@@ -59,6 +60,25 @@ class VehicleBusHW {
 
     }
 
+    /**Can Frame wrapper for can2**/
+    public static class CAN2Frame extends com.micronet.canbus.CanbusFramePort2{
+        public CAN2Frame(int id, byte[] data, CANFrameType type){
+            super(id, data, CANFrameType.upcast(type));
+        }
+
+        public static CAN2Frame downcast(com.micronet.canbus.CanbusFramePort2 mFrame){
+            return new CAN2Frame(mFrame.getId(), mFrame.getData(), CANFrameType.downcast(mFrame.getType()));
+        }
+
+        public int getId(){
+            return super.getId();
+        }
+
+        public byte[] getData(){
+            return super.getData();
+        }
+    }
+
     public static class CANSocket {
         CanbusSocket socket;
 
@@ -74,8 +94,21 @@ class VehicleBusHW {
             return CANFrame.downcast(socket.readPort1());
         }
 
+
         public void write(CANFrame frame) {
+            // Todo: write1939Port2(frame)
             socket.write1939Port1(frame);
+        }
+
+        /**
+         * Read and write for Can2
+         * **/
+        public CAN2Frame readCan2(){
+            return CAN2Frame.downcast(socket.readPort2());
+        }
+
+        public void writeCan2(CAN2Frame frame){
+            socket.write1939Port2(frame);
         }
     } // CANSocket
 
@@ -161,8 +194,9 @@ class VehicleBusHW {
         Log.d(TAG, "Filters = {\n" + filter_str.toString() + "}");
     }
 
-    InterfaceWrapper createInterface(boolean listen_only, int bitrate, CANHardwareFilter[] hardwareFilters) {
+    InterfaceWrapper createInterface(int canNumber, boolean listen_only, int bitrate, CANHardwareFilter[] hardwareFilters) {
         CanbusInterface canInterface;
+        //Todo: Adjusted parameter for adding CanNumber recognition, make sure to make changes wherever this method get called.
 
         Log.v(TAG, "createInterface: new()");
         try {
@@ -177,6 +211,9 @@ class VehicleBusHW {
         CanbusFlowControl[] flowControlMessages = setFlowControlMessages();
 
         int bitrate_kb = bitrate / 1000;
+
+        /**Create Can1 Interface**/
+        if(canNumber == CAN_PORT1){
         Log.v(TAG, "createInterface: create(" + listen_only + "," +
                 bitrate_kb + ",true, filterArray," + CAN_PORT1 + ",flowControlMessages)");
         try {
@@ -191,47 +228,96 @@ class VehicleBusHW {
             Log.e(TAG, "Unable to call create(" + listen_only + ") for CanbusInterface() " + e.toString());
             // TODO Tell ATS create failed.
             return null;
+            }
+        }
+        else if(canNumber == CAN_PORT2){
+            Log.v(TAG, "createInterface: create(" + listen_only + "," +
+                    bitrate_kb + ",true, filterArray," + CAN_PORT2 + ",flowControlMessages)");
+            try{
+                canInterface.create(listen_only,
+                        bitrate,
+                        true,
+                        filterArray,
+                        CAN_PORT2,
+                        flowControlMessages);
+
+            }catch(Exception e){
+                Log.e(TAG, "Can2: Unable to call create(" + listen_only +") for CanbusInterface()" + e.toString());
+                return null;
+            }
         }
 
         Log.d(TAG, "Interface created @ " + bitrate + "kb " + (listen_only ? "READ-ONLY" : "READ-WRITE"));
         return new InterfaceWrapper(canInterface);
     } // createInterface()
 
-    void removeInterface(InterfaceWrapper wrappedInterface) {
-        try {
-            wrappedInterface.canbusInterface.removeCAN1();
-        } catch (Exception e) {
-            Log.e(TAG, "Unable to remove CanbusInterface() " + e.toString());
+    void removeInterface(int canNumber, InterfaceWrapper wrappedInterface) {
+
+        if(canNumber == CAN_PORT1){
+            try {
+                wrappedInterface.canbusInterface.removeCAN1();
+            } catch (Exception e) {
+                Log.e(TAG, "Unable to remove CanbusInterface() " + e.toString());
+            }
+        }else if (canNumber == CAN_PORT2){
+
+            try {
+                wrappedInterface.canbusInterface.removeCAN2();
+            } catch (Exception e) {
+                Log.e(TAG, "Unable to remove CanbusInterface() " + e.toString());
+            }
         }
+
     } // removeInterface()
 
-    SocketWrapper createSocket(InterfaceWrapper wrappedInterface) {
-        CanbusSocket socket;
+    SocketWrapper createSocket(int canNumber, InterfaceWrapper wrappedInterface) {
+        CanbusSocket socket = null;
 
-        // open a new socket.
-        try {
-            socket = wrappedInterface.canbusInterface.createSocketCAN1();
-            if (socket == null) {
-                Log.e(TAG, "Socket not created .. returned NULL");
+        // create a new socket for Can1.
+        if(canNumber == CAN_PORT1) {
+            try {
+                socket = wrappedInterface.canbusInterface.createSocketCAN1();
+                if (socket == null) {
+                    Log.e(TAG, "Socket not created .. returned NULL");
+                    return null;
+                }
+                // set socket options here
+            } catch (Exception e) {
+                Log.e(TAG, "Exception creating Socket: " + e.toString(), e);
                 return null;
             }
-            // set socket options here
-        } catch (Exception e) {
-            Log.e(TAG, "Exception creating Socket: "  + e.toString(), e);
-            return null;
+        }else if(canNumber == CAN_PORT2){ //create a new socket for Can2.
+            try{
+                socket = wrappedInterface.canbusInterface.createSocketCAN2();
+                if(socket == null){
+                    Log.e(TAG, "Socket not created .. return NULL");
+                    return null;
+                }
+            }catch(Exception e){
+                Log.e(TAG, "Exception creating Socket: " + e.toString(), e);
+            }
         }
+
         return new SocketWrapper(socket);
     } // createSocket()
 
 
-    boolean openSocket(SocketWrapper wrappedSocket, boolean discardBuffer) {
-        try {
-            wrappedSocket.canbusSocket.openCan1();
-        } catch (Exception e) {
-            Log.e(TAG, "Exception opening Socket: " +  e.toString(), e);
-            return false;
+    boolean openSocket(int canNumber, SocketWrapper wrappedSocket, boolean discardBuffer) {
+        if(canNumber == CAN_PORT1) {// Opening socket for Can1
+            try {
+                wrappedSocket.canbusSocket.openCan1();
+            } catch (Exception e) {
+                Log.e(TAG, "Exception opening Socket: " + e.toString(), e);
+                return false;
+            }
+        }else if (canNumber == CAN_PORT2){// Opening socket for Can2
+            try{
+                wrappedSocket.canbusSocket.openCan2();
+            }catch(Exception e){
+                Log.e(TAG, "Exception opening Socket: " + e.toString(), e);
+                return false;
+            }
         }
-
         // we have to discard when opening a socket at a new bitrate, but this causes a 3 second gap in frame reception
 
         if (discardBuffer) {
@@ -247,8 +333,10 @@ class VehicleBusHW {
     } // openSocket
 
 
-    void closeSocket(SocketWrapper wrappedSocket) {
+    void closeSocket(int canNumber, SocketWrapper wrappedSocket) {
+
         // close the socket
+        if(canNumber == CAN_PORT1){
         try {
             Log.d(TAG, "Trying to close the socket..");
             if (wrappedSocket.canbusSocket != null)
@@ -257,6 +345,17 @@ class VehicleBusHW {
             wrappedSocket = null;
         } catch (Exception e) {
             Log.e(TAG, "Exception closeSocket()" + e.toString(), e);
+            }
+        }else if(canNumber == CAN_PORT2){
+            try {
+                Log.d(TAG, "Trying to close the socket..");
+                if (wrappedSocket.canbusSocket != null)
+                    wrappedSocket.canbusSocket.close1939Port2();
+                wrappedSocket.canbusSocket = null;
+                wrappedSocket = null;
+            }catch(Exception e){
+                Log.e(TAG, "Exception closeSocket()" + e.toString(), e);
+            }
         }
     } // closeSocket();
 

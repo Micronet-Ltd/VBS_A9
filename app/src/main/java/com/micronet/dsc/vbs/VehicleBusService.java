@@ -44,6 +44,7 @@ public class VehicleBusService extends Service {
     boolean hasStartedCAN = false;
     boolean hasStartedJ1708 = false;
 
+    static int CAN_NUMBER = 0;
 
     Handler mainHandler = null;
 
@@ -115,16 +116,20 @@ public class VehicleBusService extends Service {
                 int bitrate = intent.getIntExtra(VehicleBusConstants.SERVICE_EXTRA_BITRATE, VehicleBusCAN.DEFAULT_BITRATE);
                 boolean auto_detect = intent.getBooleanExtra(VehicleBusConstants.SERVICE_EXTRA_AUTODETECT, false);
                 boolean skip_verify = intent.getBooleanExtra(VehicleBusConstants.SERVICE_EXTRA_SKIPVERIFY, false);
+                // Todo: add canBus
+                int canNumber = intent.getIntExtra(VehicleBusConstants.SERVICE_CAN_PORT_NUMBER, VehicleBusCAN.DEFAULT_CAN_NUMBER);
+
+                CAN_NUMBER = canNumber; /**Setting the CAN_NUMBER to match the canNumber, this is used for other classes**/
 
                 int[] ids = intent.getIntArrayExtra(VehicleBusConstants.SERVICE_EXTRA_HARDWAREFILTER_IDS);
                 int[] masks = intent.getIntArrayExtra(VehicleBusConstants.SERVICE_EXTRA_HARDWAREFILTER_MASKS);
 
                 // remember that this was our last request
-                saveCAN(true, bitrate, auto_detect, ids, masks);
+                saveCAN(true, bitrate, auto_detect, ids, masks, canNumber); //Todo: add canBus
 
                 // and do it
                 stopCAN(false);
-                startCAN(bitrate, skip_verify, auto_detect, ids, masks, false);
+                startCAN(bitrate, skip_verify, auto_detect, ids, masks, canNumber,false); // Todo: add canBus
             }
 
         } else if (action.equals(VehicleBusConstants.SERVICE_ACTION_STOP)) {
@@ -133,7 +138,7 @@ public class VehicleBusService extends Service {
             // ignore J1708 requests for now, J1708 is stopped same time as CAN
             if (bus.equals("CAN")) {
 
-                saveCAN(false, 0, false, null, null);
+                saveCAN(false, 0, false, null, null, 0); // Todo: addCanBus. Ask about this, do I need anything else to tell the service to close canPort?
                 if (!isAnythingElseOn(VBUS_CAN)) {
                     setBackground();
                     stopSelf(); // nothing on, stop everything and exit
@@ -178,6 +183,7 @@ public class VehicleBusService extends Service {
     //  move the service to the foreground and display the icon
     //////////////////////////////////////////////////////////////////
     void setForeground() {
+        //Todo: Here is the place to manage the notification, come back later to add "Currently Opening Can Number :D "
         NotificationChannel notificationChannel = new NotificationChannel(CHANNEL_ID, APP_NAME, NotificationManager.IMPORTANCE_DEFAULT);
         notificationChannel.setDescription(VBS_CHANNEL_DESCRIPTION);
         NotificationManager notificationManager = getSystemService(NotificationManager.class);
@@ -223,6 +229,8 @@ public class VehicleBusService extends Service {
             int bitrate = state.readState(State.CAN_BITRATE);
             if (bitrate == 0) bitrate = VehicleBusCAN.DEFAULT_BITRATE;
             boolean auto_detect = state.readStateBool(State.FLAG_CAN_AUTODETECT);
+            //Todo: Added canNumber here.
+            int canNumber = state.readState(State.CAN_NUMBER);
 
             String idstring = state.readStateString(State.CAN_FILTER_IDS);
             String maskstring = state.readStateString(State.CAN_FILTER_MASKS);
@@ -243,7 +251,7 @@ public class VehicleBusService extends Service {
                 }
             }
 
-            startCAN(bitrate, false, auto_detect, ids, masks, true);
+            startCAN(bitrate, false, auto_detect, ids, masks, canNumber,true);
         }
 
         if (enJ1708) { // enable J1708 bus now b/c it can get tacked onto CAN.
@@ -303,7 +311,7 @@ public class VehicleBusService extends Service {
     // saveCAN()
     // save CAN information to file so we can load it up on restart.
     ////////////////////////////////////////////////////////////////
-    void saveCAN(boolean enabled, int bitrate, boolean auto_detect, int[] ids, int masks[]) {
+    void saveCAN(boolean enabled, int bitrate, boolean auto_detect, int[] ids, int masks[], int canNumber) {
         Context context = getApplicationContext();
 
         State state;
@@ -315,6 +323,8 @@ public class VehicleBusService extends Service {
             // save more info about the CAN
             state.writeState(State.CAN_BITRATE, bitrate);
             state.writeState(State.FLAG_CAN_AUTODETECT, (auto_detect ? 1 : 0));
+            //Todo: Ask about this part, where this saving goes?
+            state.writeState(State.CAN_NUMBER, canNumber);
 
             String idstring = "";
             String maskstring = "";
@@ -350,7 +360,7 @@ public class VehicleBusService extends Service {
     //  load_last_confirmed: whether or not we should load the last confirmed bitrate from file
     //      when service receives the "restart" action, then we will load this from file, otherwise we only use what is in memory
     ////////////////////////////////////////////////////////////////
-    void startCAN(int bitrate, boolean skip_verify, boolean auto_detect, int[] ids, int masks[], boolean load_last_confirmed) {
+    void startCAN(int bitrate, boolean skip_verify, boolean auto_detect, int[] ids, int masks[], int canNumber, boolean load_last_confirmed) {
         Log.d(TAG, "+startCAN():");
 
         if (hasStartedCAN) {
@@ -377,13 +387,15 @@ public class VehicleBusService extends Service {
 
         if (load_last_confirmed)
             my_can.loadConfirmedBitRate();
+            my_can.loadConfirmedCanNumber(); /**Added loadConfirmedCanNumber()**/
 
         if (skip_verify) {
             // we've requested to treat this bitrate as confirmed
             my_can.setConfirmedBitRate(bitrate);
+            my_can.setConfirmedCanNumber(canNumber); /**Added setConfirmedCanNumber()**/
         }
 
-        my_can.start(bitrate, auto_detect, canHardwareFilters);
+        my_can.start(bitrate, auto_detect, canHardwareFilters, canNumber);
 
 /*
         // now we need to restart J1708 again if we previously stopped it

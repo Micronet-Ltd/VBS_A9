@@ -21,10 +21,12 @@ public class State {
     public static final int FLAG_CAN_ON = 201;
     public static final int FLAG_CAN_LISTENONLY = 202; // deprecated in favor of AUTODETECT
     public static final int CAN_BITRATE = 203;
+    public static final int CAN_NUMBER = 209;
     public static final int CAN_FILTER_IDS = 204;
     public static final int CAN_FILTER_MASKS = 205;
     public static final int FLAG_CAN_AUTODETECT = 206;
     public static final int CAN_CONFIRMED_BITRATE = 207;    // prior bitrate that was confirmed (so we don't need listen only)
+    public static final int CAN_CONFIRMED_NUMBER = 208; //Todo: Ask about the value setting. Seems like it's in some kind of ordering.
     public static final int FLAG_J1708_ON = 210;
 
     Context context;

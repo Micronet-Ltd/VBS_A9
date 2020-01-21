@@ -37,6 +37,7 @@ public class VehicleBusCAN {
 
 
     public static int DEFAULT_BITRATE = 250000; // a default to use if bitrate is not specified (and used as 1rst option for auto-detect)
+    public static int DEFAULT_CAN_NUMBER = 2; // a default can number when user did not specified in the configuration.xml( 2 = CAN1)
 
     static final int SAFETY_MAX_OUTGOING_QUEUE_SIZE = 10; // just make sure this queue doesn't ever keep growing forever
 
@@ -61,12 +62,13 @@ public class VehicleBusCAN {
 
 
     int confirmedBusBitrate = 0; // set to a bitrate that we know is working so we can skip listen-only mode
-
+    int confirmedCanNumber = 0;
 
 
     public VehicleBusCAN(Context context) {
         busWrapper = VehicleBusWrapper.getInstance();
         busWrapper.isUnitTesting = false;
+        busWrapper.canNumber = DEFAULT_CAN_NUMBER;
         this.context = context;
 
         busDiscoverer = new VehicleBusDiscovery(context, busWrapper, BUS_NAME);
@@ -75,6 +77,7 @@ public class VehicleBusCAN {
     public VehicleBusCAN(Context context, boolean isUnitTesting) {
         busWrapper = VehicleBusWrapper.getInstance();
         busWrapper.isUnitTesting = isUnitTesting;
+        busWrapper.canNumber = DEFAULT_CAN_NUMBER;
         this.context = context;
 
         busDiscoverer = new VehicleBusDiscovery(context, busWrapper, BUS_NAME);
@@ -89,7 +92,7 @@ public class VehicleBusCAN {
     //      2) Confirmed (if we previously received frames at this bitrate and haven't switched bitrates or restarted app since)
     //      3) Unconfirmed (all others .. this will start up in listen mode until a frame is received)
     ///////////////////////////////////////////////////////
-    public boolean start(int initial_bitrate, boolean auto_detect, VehicleBusWrapper.CANHardwareFilter[] hardwareFilters) {
+    public boolean start(int initial_bitrate, boolean auto_detect, VehicleBusWrapper.CANHardwareFilter[] hardwareFilters, int canNumber) { // Todo: Added canNumber, but haven't been used.
 
 
         Log.v(TAG, "start() @ " + initial_bitrate + "kb " +
@@ -117,6 +120,7 @@ public class VehicleBusCAN {
         if (auto_detect) {
             // Auto-detect mode
             clearConfirmedBitRate(); // erase any prior confirmations of bitrate
+            clearConfirmedCanNumber(); // Todo: monitor this, seems like it should be here, just not so sure..
             busDiscoverer.setCharacteristics(initial_bitrate, hardwareFilters);
             busDiscoverer.startDiscovery(busReadyReadOnlyCallback);
         } else
@@ -125,7 +129,7 @@ public class VehicleBusCAN {
 
             // we know that this bitrate works since we've already used this bitrate
             // put our sockets into read & write mode
-            busWrapper.setCharacteristics(false, initial_bitrate, hardwareFilters);
+            busWrapper.setCharacteristics(false, initial_bitrate, hardwareFilters, canNumber);// Todo: Added canNumber, monitor this one and make sure it works.
             busWrapper.start(BUS_NAME, busReadyReadWriteCallback, null);
         }
         else {
@@ -134,7 +138,8 @@ public class VehicleBusCAN {
             // we do not know if this bitrate works since we have not used it
             // put our sockets in read-only mode
             clearConfirmedBitRate(); // erase any prior confirmations of bitrate
-            busWrapper.setCharacteristics(true, initial_bitrate, hardwareFilters);
+            clearConfirmedCanNumber();
+            busWrapper.setCharacteristics(true, initial_bitrate, hardwareFilters, canNumber);
             busWrapper.start(BUS_NAME, busReadyReadOnlyCallback, null);
         }
 
@@ -361,7 +366,7 @@ public class VehicleBusCAN {
     // setConfirmedBitRate()
     //  sets the bitrate as confirmed so we don't need to start in listen mode next time
     ///////////////////////////////////////////////////////////////////
-    void setConfirmedBitRate(int bitrate) {
+    void setConfirmedBitRate(int bitrate) { //Todo: Ask about this, should we include a confirmedCanPort as well
 
         // remember that we are good at this bitrate now
         confirmedBusBitrate = bitrate;
@@ -373,6 +378,20 @@ public class VehicleBusCAN {
         state = new State(context);
 
         state.writeState(State.CAN_CONFIRMED_BITRATE, confirmedBusBitrate ); // this is our discovered bitrate
+    }
+
+    /**
+     * setConfirmedCanNumber()
+     *  sets the canNumber as confirmed, so we don't need to start in listening mode next time.
+     * **/
+    void setConfirmedCanNumber(int canNumber){
+        confirmedCanNumber = canNumber;
+
+        Log.v(TAG, "CAN Number " + confirmedCanNumber + " is confirmed");
+        State state;
+        state = new State(context);
+
+        state.writeState(State.CAN_CONFIRMED_NUMBER, confirmedCanNumber);
     }
 
 
@@ -393,6 +412,19 @@ public class VehicleBusCAN {
         state.writeState(State.CAN_CONFIRMED_BITRATE, confirmedBusBitrate ); // this is our discovered bitrate
     }
 
+    /**
+     * clearConfirmedCanNumber()
+     *  clear the can number to unconfirmed, so we can always start in listening mode.
+     * **/
+    void clearConfirmedCanNumber(){
+        confirmedCanNumber = 0;
+
+        State state;
+        state = new State(context);
+
+        state.writeState(State.CAN_CONFIRMED_NUMBER, confirmedCanNumber);
+    }
+
 
     ///////////////////////////////////////////////////////////////////
     // loadConfirmedBitRate()
@@ -407,6 +439,20 @@ public class VehicleBusCAN {
         confirmedBusBitrate = state.readState(State.CAN_CONFIRMED_BITRATE); // this is our discovered bitrate
 
         Log.v(TAG, "Loaded confirmed CAN bitrate " + confirmedBusBitrate);
+    }
+
+    /**
+     *  loadConfirmedCanNumber()
+     *      load a confirmed status from file so we don't need to start in listen mode next time
+     *      this is done when the service is "restarted" (due to crash), but not when it is started normal
+     * **/
+    void loadConfirmedCanNumber(){
+        State state;
+        state =new State(context);
+
+        confirmedCanNumber = state.readState(State.CAN_CONFIRMED_NUMBER);
+
+        Log.v(TAG, "Loaded confirmed can number " + confirmedCanNumber);
     }
 
 

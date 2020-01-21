@@ -198,6 +198,9 @@ public class VehicleBusDiscovery {
     //  changes the bitrate -- will not take effect until the next time bus is (re-)started
     ///////////////////////////////////////////////////////////////
     void changeBitrate(int new_bitrate) {
+
+        int canNumber = VehicleBusService.CAN_NUMBER;
+
         if (new_bitrate == 500000) {
             discoveryStage = DISCOVERY_STAGE_500;
         } else {
@@ -205,8 +208,9 @@ public class VehicleBusDiscovery {
             discoveryStage = DISCOVERY_STAGE_250;
         }
 
+
         // restart on new bit rate, keep with discovery callbacks
-        busWrapper.setCharacteristics(true, new_bitrate, hardwareFilters);
+        busWrapper.setCharacteristics(true, new_bitrate, hardwareFilters, canNumber);
     }
 
 
