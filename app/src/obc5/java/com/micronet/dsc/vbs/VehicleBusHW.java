@@ -340,7 +340,7 @@ class VehicleBusHW {
                     flowControlMessages);
 
         } catch (Exception e) {
-            Log.e(TAG, "Unable to call create(" + listen_only + ") for CanbusInterface() " + e.toString());
+            Log.e(TAG, "obc5 - Unable to call create(" + listen_only + ") for CanbusInterface() " + e.toString());
             return null;
         }
 

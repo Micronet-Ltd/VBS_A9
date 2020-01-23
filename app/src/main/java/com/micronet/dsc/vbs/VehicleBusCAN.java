@@ -37,7 +37,7 @@ public class VehicleBusCAN {
 
 
     public static int DEFAULT_BITRATE = 250000; // a default to use if bitrate is not specified (and used as 1rst option for auto-detect)
-    public static int DEFAULT_CAN_NUMBER = 2; // a default can number when user did not specified in the configuration.xml( 2 = CAN1)
+    public static int DEFAULT_CAN_NUMBER = 2; //Todo: Updated default value for CanBus Setting, It's String now
 
     static final int SAFETY_MAX_OUTGOING_QUEUE_SIZE = 10; // just make sure this queue doesn't ever keep growing forever
 

@@ -16,7 +16,6 @@ package com.micronet.dsc.vbs;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -24,10 +23,6 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.support.v4.app.NotificationCompat;
-
-
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class VehicleBusService extends Service {
@@ -89,6 +84,7 @@ public class VehicleBusService extends Service {
         action = intent.getAction();
         if (action.equals(VehicleBusConstants.SERVICE_ACTION_RESTART)) {
             android.util.Log.i(TAG, "Vehicle Bus Service Restarting");
+            setForeground();
             if (!startFromFile()) return START_NOT_STICKY;
             return START_NOT_STICKY;
         }
@@ -117,10 +113,10 @@ public class VehicleBusService extends Service {
                 boolean auto_detect = intent.getBooleanExtra(VehicleBusConstants.SERVICE_EXTRA_AUTODETECT, false);
                 boolean skip_verify = intent.getBooleanExtra(VehicleBusConstants.SERVICE_EXTRA_SKIPVERIFY, false);
                 // Todo: add canBus
-                int canNumber = intent.getIntExtra(VehicleBusConstants.SERVICE_CAN_PORT_NUMBER, VehicleBusCAN.DEFAULT_CAN_NUMBER);
+                int canNumber = intent.getIntExtra(VehicleBusConstants.SERVICE_EXTRA_CAN_NUMBER, VehicleBusCAN.DEFAULT_CAN_NUMBER);
 
                 CAN_NUMBER = canNumber; /**Setting the CAN_NUMBER to match the canNumber, this is used for other classes**/
-
+                    Log.d(TAG, "CAN_NUMBER = " + CAN_NUMBER);
                 int[] ids = intent.getIntArrayExtra(VehicleBusConstants.SERVICE_EXTRA_HARDWAREFILTER_IDS);
                 int[] masks = intent.getIntArrayExtra(VehicleBusConstants.SERVICE_EXTRA_HARDWAREFILTER_MASKS);
 

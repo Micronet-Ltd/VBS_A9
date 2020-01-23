@@ -67,7 +67,7 @@ public final class VehicleBusConstants {
 
     //  Extra: "canPortNumber" (int). Defines which port that user wants to open for CanBus. Can1 = 2 / Can2 = 3.
     //      use with STAR action only
-    public static final String SERVICE_CAN_PORT_NUMBER = "canPortNumber";
+    public static final String SERVICE_EXTRA_CAN_NUMBER = "canNumber";
 
 
     //////////////////////////////////////

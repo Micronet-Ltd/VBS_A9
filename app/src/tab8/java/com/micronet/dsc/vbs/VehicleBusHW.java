@@ -216,6 +216,8 @@ class VehicleBusHW {
         if(canNumber == CAN_PORT1){
         Log.v(TAG, "createInterface: create(" + listen_only + "," +
                 bitrate_kb + ",true, filterArray," + CAN_PORT1 + ",flowControlMessages)");
+
+        Log.d(TAG, "bitrate = " + bitrate);
         try {
             canInterface.create(listen_only,
                     bitrate,
@@ -225,7 +227,7 @@ class VehicleBusHW {
                     flowControlMessages);
 
         } catch (Exception e) {
-            Log.e(TAG, "Unable to call create(" + listen_only + ") for CanbusInterface() " + e.toString());
+            Log.e(TAG, "Can1: Unable to call create(" + listen_only +") | CanNumber = (" +  canNumber+ ") for CanbusInterface()" + e.toString());
             // TODO Tell ATS create failed.
             return null;
             }
@@ -242,7 +244,7 @@ class VehicleBusHW {
                         flowControlMessages);
 
             }catch(Exception e){
-                Log.e(TAG, "Can2: Unable to call create(" + listen_only +") for CanbusInterface()" + e.toString());
+                Log.e(TAG, "Can2: Unable to call create(" + listen_only +") | CanNumber = (" +  canNumber+ ") for CanbusInterface()" + e.toString());
                 return null;
             }
         }
