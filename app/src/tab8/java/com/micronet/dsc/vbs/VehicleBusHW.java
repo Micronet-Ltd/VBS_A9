@@ -259,14 +259,14 @@ class VehicleBusHW {
             try {
                 wrappedInterface.canbusInterface.removeCAN1();
             } catch (Exception e) {
-                Log.e(TAG, "Unable to remove CanbusInterface() " + e.toString());
+                Log.e(TAG, "Can1: Unable to remove CanbusInterface() " + e.toString());
             }
         }else if (canNumber == CAN_PORT2){
 
             try {
                 wrappedInterface.canbusInterface.removeCAN2();
             } catch (Exception e) {
-                Log.e(TAG, "Unable to remove CanbusInterface() " + e.toString());
+                Log.e(TAG, "Can2: Unable to remove CanbusInterface() " + e.toString());
             }
         }
 
@@ -282,6 +282,8 @@ class VehicleBusHW {
                 if (socket == null) {
                     Log.e(TAG, "Socket not created .. returned NULL");
                     return null;
+                }else{
+                    Log.d(TAG, "Can1: Socket created: " + socket);
                 }
                 // set socket options here
             } catch (Exception e) {
@@ -294,6 +296,8 @@ class VehicleBusHW {
                 if(socket == null){
                     Log.e(TAG, "Socket not created .. return NULL");
                     return null;
+                }else{
+                    Log.d(TAG, "Can2: Socket created: " + socket);
                 }
             }catch(Exception e){
                 Log.e(TAG, "Exception creating Socket: " + e.toString(), e);
@@ -308,6 +312,7 @@ class VehicleBusHW {
         if(canNumber == CAN_PORT1) {// Opening socket for Can1
             try {
                 wrappedSocket.canbusSocket.openCan1();
+                Log.d(TAG, "Can1: Socket Opened");
             } catch (Exception e) {
                 Log.e(TAG, "Exception opening Socket: " + e.toString(), e);
                 return false;
@@ -315,6 +320,7 @@ class VehicleBusHW {
         }else if (canNumber == CAN_PORT2){// Opening socket for Can2
             try{
                 wrappedSocket.canbusSocket.openCan2();
+                Log.d(TAG, "Can2: Socket Opened");
             }catch(Exception e){
                 Log.e(TAG, "Exception opening Socket: " + e.toString(), e);
                 return false;
@@ -325,6 +331,7 @@ class VehicleBusHW {
         if (discardBuffer) {
             try {
                 wrappedSocket.canbusSocket.discardInBuffer();
+                Log.d(TAG, "Socket discarded");
             } catch (Exception e) {
                 Log.e(TAG, "Exception discarding Socket buffer: " + e.toString(), e);
                 return false;
@@ -345,6 +352,7 @@ class VehicleBusHW {
                 wrappedSocket.canbusSocket.close1939Port1();
             wrappedSocket.canbusSocket = null;
             wrappedSocket = null;
+            Log.e(TAG, "Can1: Socket Closed");
         } catch (Exception e) {
             Log.e(TAG, "Exception closeSocket()" + e.toString(), e);
             }
@@ -355,6 +363,7 @@ class VehicleBusHW {
                     wrappedSocket.canbusSocket.close1939Port2();
                 wrappedSocket.canbusSocket = null;
                 wrappedSocket = null;
+                Log.e(TAG, "Can2: Socket Closed");
             }catch(Exception e){
                 Log.e(TAG, "Exception closeSocket()" + e.toString(), e);
             }

@@ -545,12 +545,12 @@ public class VehicleBusWrapper extends VehicleBusHW {
         //  returns true if setup was successful, otherwise false
         ///////////////////////////////////////////
         boolean doInternalSetup() { // Todo: deleted parameter-canNumber. This method should be getting it from the global.
-            setupInterface = createInterface(canNumber, listen_only, bitrate, hardwareFilters);
+            setupInterface = createInterface(canNumber, listen_only, bitrate, hardwareFilters); /**Stage 1: Create interface**/
             if (setupInterface == null) return false;
 
 
             Log.v(TAG, "creating socket");
-            setupSocket = createSocket(canNumber, setupInterface);
+            setupSocket = createSocket(canNumber, setupInterface); /**Stage 2: Create Socket**/
             if (setupSocket == null) {
                 removeInterface(canNumber, setupInterface);
                 isClosed = true;
