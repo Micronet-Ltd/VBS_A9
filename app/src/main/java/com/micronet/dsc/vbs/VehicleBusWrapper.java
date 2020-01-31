@@ -15,11 +15,6 @@ package com.micronet.dsc.vbs;
 import android.os.Handler;
 import android.os.Looper;
 
-
-import com.micronet.canbus.CanbusInterface;
-import com.micronet.canbus.CanbusSocket;
-
-
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -111,10 +106,10 @@ public class VehicleBusWrapper extends VehicleBusHW {
     // setCharacteristics()
     //  set details for the CAN, call this before starting a CAN bus
     //////////////////////////////////////////////////
-    public boolean setCharacteristics(boolean listen_only, int bitrate, CANHardwareFilter[] hwFilters, int canNumber) { // Todo: Should I include canNumber in here? since I
+    public boolean setCharacteristics(boolean listen_only, int bitrate, CANHardwareFilter[] hwFilters, int canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControls) { // Todo: Should I include canNumber in here? since I
 
         // will take effect on the next bus stop/start cycle
-        busSetupRunnable.setCharacteristics(listen_only, bitrate, hwFilters, canNumber);
+        busSetupRunnable.setCharacteristics(listen_only, bitrate, hwFilters, canNumber, flowControls);
         return true;
     } // setCharacteristics()
 
@@ -338,7 +333,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
     public CANSocket getCANSocket() {
         if (busSetupRunnable == null) return null; // never even created
         if (!busSetupRunnable.isSetup()) return null; // no valid socket
-        return new CANSocket(busSetupRunnable.setupSocket);
+        return new CANSocket(busSetupRunnable.setupSocket, busSetupRunnable.canNumber);
     } // getCANSocket()
 
 
@@ -474,6 +469,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
         int bitrate = 250000; // default bit rate
         int canNumber = 2;
         CANHardwareFilter[] hardwareFilters = null;
+        ArrayList<VehicleBusHW.CANFlowControl> flowControls;
 
 
         BusSetupRunnable() {
@@ -487,12 +483,13 @@ public class VehicleBusWrapper extends VehicleBusHW {
 
 
 
-        public void setCharacteristics(boolean new_listen_only, int new_bitrate, CANHardwareFilter[] new_hardwareFilters, int new_canNumber) {
+        public void setCharacteristics(boolean new_listen_only, int new_bitrate, CANHardwareFilter[] new_hardwareFilters, int new_canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControlsArr) {
             // these take effect at next Setup()
             listen_only = new_listen_only;
             bitrate = new_bitrate;
             hardwareFilters = new_hardwareFilters;
             canNumber = new_canNumber;
+            flowControls = flowControlsArr;
         }
 
 
@@ -545,7 +542,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
         //  returns true if setup was successful, otherwise false
         ///////////////////////////////////////////
         boolean doInternalSetup() { // Todo: deleted parameter-canNumber. This method should be getting it from the global.
-            setupInterface = createInterface(canNumber, listen_only, bitrate, hardwareFilters); /**Stage 1: Create interface**/
+            setupInterface = createInterface(canNumber, listen_only, bitrate, hardwareFilters, flowControls); /**Stage 1: Create interface**/
             if (setupInterface == null) return false;
 
 

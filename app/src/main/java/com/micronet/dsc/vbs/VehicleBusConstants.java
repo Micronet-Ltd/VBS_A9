@@ -66,8 +66,12 @@ public final class VehicleBusConstants {
     public static final String SERVICE_EXTRA_HARDWAREFILTER_MASKS = "hardwareFilterMasks";
 
     //  Extra: "canPortNumber" (int). Defines which port that user wants to open for CanBus. Can1 = 2 / Can2 = 3.
-    //      use with STAR action only
+    //      use with START action only
     public static final String SERVICE_EXTRA_CAN_NUMBER = "canNumber";
+
+    //  Extra: "flowControl" (boolean). Defines whether flow control should be used from /sdcard/VBS/config.xml.
+    //      use with START action only
+    public static final String SERVICE_EXTRA_FLOW_CONTROL = "flowControl";
 
 
     //////////////////////////////////////

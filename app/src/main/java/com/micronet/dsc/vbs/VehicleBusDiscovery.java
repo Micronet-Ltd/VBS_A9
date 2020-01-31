@@ -18,6 +18,7 @@ package com.micronet.dsc.vbs;
 import android.content.Context;
 import android.os.Handler;
 
+import java.util.ArrayList;
 
 
 public class VehicleBusDiscovery {
@@ -48,6 +49,7 @@ public class VehicleBusDiscovery {
     int initial_bitrate = VehicleBusCAN.DEFAULT_BITRATE;
     VehicleBusWrapper.CANHardwareFilter[] hardwareFilters; // this must be set to something, otherwise no packets will be received and thus bus not discovered
     String BUS_NAME; // the name of the bus we are discovering on, passed to the wrapper
+    ArrayList<VehicleBusHW.CANFlowControl> flowControls;
 
 
     //callbacks that are passed to the wrapper
@@ -81,9 +83,10 @@ public class VehicleBusDiscovery {
     //      call this before starting discovery
     //  hwFilters : determines what qualifies as a successful discovery .. this must be set to something
     ////////////////////////////////////////////////////////
-    public void setCharacteristics(int initial_bitrate, VehicleBusWrapper.CANHardwareFilter[] hwFilters) {
+    public void setCharacteristics(int initial_bitrate, VehicleBusWrapper.CANHardwareFilter[] hwFilters, ArrayList<VehicleBusHW.CANFlowControl> flowControlsArr) {
         this.initial_bitrate = initial_bitrate;
         this.hardwareFilters = hwFilters;
+        this.flowControls = flowControlsArr;
     }
 
 
@@ -210,7 +213,7 @@ public class VehicleBusDiscovery {
 
 
         // restart on new bit rate, keep with discovery callbacks
-        busWrapper.setCharacteristics(true, new_bitrate, hardwareFilters, canNumber);
+        busWrapper.setCharacteristics(true, new_bitrate, hardwareFilters, canNumber, flowControls);
     }
 
 

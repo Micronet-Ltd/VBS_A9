@@ -92,7 +92,7 @@ public class VehicleBusCAN {
     //      2) Confirmed (if we previously received frames at this bitrate and haven't switched bitrates or restarted app since)
     //      3) Unconfirmed (all others .. this will start up in listen mode until a frame is received)
     ///////////////////////////////////////////////////////
-    public boolean start(int initial_bitrate, boolean auto_detect, VehicleBusWrapper.CANHardwareFilter[] hardwareFilters, int canNumber) { // Todo: Added canNumber, but haven't been used.
+    public boolean start(int initial_bitrate, boolean auto_detect, VehicleBusWrapper.CANHardwareFilter[] hardwareFilters, int canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
 
 
         Log.v(TAG, "start() @ " + initial_bitrate + "kb " +
@@ -121,25 +121,23 @@ public class VehicleBusCAN {
             // Auto-detect mode
             clearConfirmedBitRate(); // erase any prior confirmations of bitrate
             clearConfirmedCanNumber(); // Todo: monitor this, seems like it should be here, just not so sure..
-            busDiscoverer.setCharacteristics(initial_bitrate, hardwareFilters);
+            busDiscoverer.setCharacteristics(initial_bitrate, hardwareFilters, flowControls);
             busDiscoverer.startDiscovery(busReadyReadOnlyCallback);
-        } else
-        if (confirmedBusBitrate == initial_bitrate) {
+        } else if (confirmedBusBitrate == initial_bitrate) {
             // Confirmed mode
 
             // we know that this bitrate works since we've already used this bitrate
             // put our sockets into read & write mode
-            busWrapper.setCharacteristics(false, initial_bitrate, hardwareFilters, canNumber);// Todo: Added canNumber, monitor this one and make sure it works.
+            busWrapper.setCharacteristics(false, initial_bitrate, hardwareFilters, canNumber, flowControls);// Todo: Added canNumber, monitor this one and make sure it works.
             busWrapper.start(BUS_NAME, busReadyReadWriteCallback, null);
-        }
-        else {
+        } else {
             // Unconfirmed mode
 
             // we do not know if this bitrate works since we have not used it
             // put our sockets in read-only mode
             clearConfirmedBitRate(); // erase any prior confirmations of bitrate
             clearConfirmedCanNumber();
-            busWrapper.setCharacteristics(true, initial_bitrate, hardwareFilters, canNumber);
+            busWrapper.setCharacteristics(true, initial_bitrate, hardwareFilters, canNumber, flowControls);
             busWrapper.start(BUS_NAME, busReadyReadOnlyCallback, null);
         }
 
@@ -580,6 +578,7 @@ public class VehicleBusCAN {
                         Log.v(TAG, "frame --> " + String.format("%02x", outFrame.getId()) + " : " + Log.bytesToHex(outFrame.getData(), outFrame.getData().length));
                         try {
                             canWriteSocket.write(outFrame);
+
                             //Log.d(TAG, "Write Returns");
                         } catch (Exception e) {
                             // exceptions are expected if the interface is closed
