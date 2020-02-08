@@ -4,6 +4,10 @@
 
 package com.micronet.dsc.vbs;
 
+import android.graphics.Color;
+import android.support.v4.app.NotificationCompat;
+
+import com.micronet.canbus.CanbusException;
 import com.micronet.canbus.CanbusFilter;
 import com.micronet.canbus.CanbusFlowControl;
 import com.micronet.canbus.CanbusFramePort2;
@@ -13,6 +17,8 @@ import com.micronet.canbus.CanbusSocket;
 
 import java.util.ArrayList;
 import java.util.Locale;
+
+import static com.micronet.dsc.vbs.VehicleBusService.service;
 
 class VehicleBusHW {
     public static final String TAG = "ATS-VBS-HW";
@@ -237,12 +243,25 @@ class VehicleBusHW {
         // Try to create interface.
         try {
             canInterface.create(listen_only, bitrate,true, filterArray, canNumber, flowControlMessages);
-        } catch (Exception e) {
-            Log.e(TAG, "Can1: Unable to call create(" + listen_only +") | CanNumber = (" +  canNumber+ ") for CanbusInterface()" + e.toString());
-            // TODO Need to handle this failure correctly, same as above.
+        } catch (CanbusException e) {
+            Log.e(TAG, "Can" +(canNumber-1)+ ": Unable to call create(" + listen_only +") | CanNumber = (" +  canNumber+ ") for CanbusInterface()" + e.toString() + ". Num=" + e.getErrorCode());
+
+            switch (e.getErrorCode()) {
+                case CanbusException.INVALID_PARAMETERS:
+                    service.updateForegroundNotification("Error creating Canbus Interface for CAN "+(canNumber-1)+". Invalid parameters.", Color.RED, NotificationCompat.PRIORITY_DEFAULT);
+                    break;
+                case CanbusException.PORT_DOESNT_EXIST:
+                    service.updateForegroundNotification("Error creating Canbus Interface for CAN "+(canNumber-1)+". Port doesn't exist.", Color.RED, NotificationCompat.PRIORITY_DEFAULT);
+                    break;
+                default:
+                    service.updateForegroundNotification("Error creating Canbus Interface for CAN "+(canNumber-1)+".", Color.RED, NotificationCompat.PRIORITY_DEFAULT);
+                    break;
+            }
+
             return null;
         }
 
+        service.updateForegroundNotification("CAN " +(canNumber-1)+ ": Created Interface @" + (bitrate/1000) + "k " + (listen_only ? "in read only mode. Running.": "in normal mode. Running."), Color.GREEN, NotificationCompat.PRIORITY_DEFAULT);
         Log.d(TAG, "Interface created @ " + bitrate + "kb " + (listen_only ? "READ-ONLY" : "READ-WRITE"));
         return new InterfaceWrapper(canInterface);
     } // createInterface()
@@ -348,7 +367,7 @@ class VehicleBusHW {
                     wrappedSocket.canbusSocket.close1939Port1();
                 wrappedSocket.canbusSocket = null;
                 wrappedSocket = null;
-                Log.e(TAG, "Can1: Socket Closed");
+                Log.d(TAG, "Can1: Socket Closed");
             } catch (Exception e) {
                 Log.e(TAG, "Exception closeSocket()" + e.toString(), e);
             }
@@ -359,7 +378,7 @@ class VehicleBusHW {
                     wrappedSocket.canbusSocket.close1939Port2();
                 wrappedSocket.canbusSocket = null;
                 wrappedSocket = null;
-                Log.e(TAG, "Can2: Socket Closed");
+                Log.d(TAG, "Can2: Socket Closed");
             }catch(Exception e){
                 Log.e(TAG, "Exception closeSocket()" + e.toString(), e);
             }
@@ -415,7 +434,7 @@ class VehicleBusHW {
 
         int i = 0;
         for (CANFlowControl flowControl : flowControls) {
-            flowControlStr.append(String.format(Locale.getDefault(), "Flow Control %d: searchId-%X, responseId-%X, T-%d, Length-%d",
+            flowControlStr.append(String.format(Locale.getDefault(), "Flow Control %d: searchId-%X, responseId-%X, T-%d, Length-%d\n",
                     i++, flowControl.getSearchId(), flowControl.getResponseId(), flowControl.getFlowMessageType(), flowControl.getFlowDataLength()));
         }
 

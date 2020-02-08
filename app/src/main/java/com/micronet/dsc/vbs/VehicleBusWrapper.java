@@ -18,6 +18,8 @@ import android.os.Looper;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+import static com.micronet.dsc.vbs.VehicleBusService.service;
+
 
 /**
  * Created by dschmidt on 2/18/16.
@@ -195,7 +197,9 @@ public class VehicleBusWrapper extends VehicleBusHW {
         }
 
         // since we haven't already, we should set-up now
-        busSetupRunnable.setup();
+        if (!busSetupRunnable.setup()) {
+            return false;
+        }
 
 
         return true;
@@ -304,6 +308,13 @@ public class VehicleBusWrapper extends VehicleBusHW {
 
         if (busSetupRunnable != null)
             busSetupRunnable.teardown();
+
+        // Sleep to avoid filter dropping issue.
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
         if (busSetupRunnable != null) {
             busSetupRunnable.setup(); // this will also call callback array
@@ -515,8 +526,8 @@ public class VehicleBusWrapper extends VehicleBusHW {
         }
 
         // setup() : External call to setup the bus
-        public void setup() {
-            doInternalSetup();
+        public boolean setup() {
+            boolean result = doInternalSetup();
 
 
             /*
@@ -524,6 +535,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
             Thread setupThread = new Thread(busSetupRunnable);
             setupThread.start();
             */
+            return result;
         }
 
         // teardown () : External call to teardown the bus
@@ -543,8 +555,10 @@ public class VehicleBusWrapper extends VehicleBusHW {
         ///////////////////////////////////////////
         boolean doInternalSetup() { // Todo: deleted parameter-canNumber. This method should be getting it from the global.
             setupInterface = createInterface(canNumber, listen_only, bitrate, hardwareFilters, flowControls); /**Stage 1: Create interface**/
-            if (setupInterface == null) return false;
-
+            if (setupInterface == null) {
+                service.forceStopCAN();
+                return false;
+            }
 
             Log.v(TAG, "creating socket");
             setupSocket = createSocket(canNumber, setupInterface); /**Stage 2: Create Socket**/

@@ -16,7 +16,7 @@ import static com.micronet.dsc.vbs.VehicleBusService.TAG;
 
 public class Config {
     @SuppressLint("SdCardPath")
-    private static final String CONFIG_FILE_PATH = "/sdcard/VBS/config.xml";
+    private static final String CONFIG_FILE_PATH = "/sdcard/VBS/configuration.xml";
 
     // Tags
     private static final String PORT_TAG = "port";
@@ -121,7 +121,7 @@ public class Config {
             eventType = parser.next();
         }
 
-        portConfig.toString();
+//        portConfig.toString();
         return portConfig;
     }
 
@@ -141,6 +141,8 @@ public class Config {
     }
 
     private static void getFlowControl(XmlPullParser parser, ArrayList<VehicleBusHW.CANFlowControl> flowControls) throws XmlPullParserException, IOException {
+        Log.d(TAG, "About to parse flow control.");
+
         int eventType = parser.getEventType();
         while(!(eventType == XmlPullParser.END_TAG && FLOW_CONTROLS_TAG.equals(parser.getName()))) {
             if (parser.getEventType() == XmlPullParser.END_TAG && FLOW_CONTROL_TAG.equals(parser.getName())) {
@@ -159,9 +161,10 @@ public class Config {
     private static byte[] parseBytes(String data) {
         String[] strArr = data.replaceAll(" ", "").split(",");
         byte[] bytes = new byte[strArr.length];
+        Log.d(TAG, "Parsing data bytes.");
 
         for (int i = 0; i < strArr.length; i++) {
-            bytes[i] = Integer.decode(strArr[i].replaceAll("0x", "")).byteValue();
+            bytes[i] = Integer.decode(strArr[i]).byteValue();
         }
 
         return bytes;

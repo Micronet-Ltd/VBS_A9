@@ -107,7 +107,10 @@ public class VehicleBusDiscovery {
 
         // setup the first socket
         changeBitrate(initial_bitrate);
-        busWrapper.start(BUS_NAME, busDiscoverReadyCallback, null);
+        if (!busWrapper.start(BUS_NAME, busDiscoverReadyCallback, null)) {
+            Log.e(TAG, "Error starting bus with bus wrapper.");
+            return false;
+        };
 
         // and wait a certain amount of time on this socket before switching bitrates
         mainHandler.postDelayed(discoverBusTask, DISCOVER_BUS_WAIT_MS); // try again in five seconds

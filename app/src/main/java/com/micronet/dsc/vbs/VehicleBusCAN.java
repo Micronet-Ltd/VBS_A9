@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static com.micronet.dsc.vbs.VehicleBusService.service;
+
 
 public class VehicleBusCAN {
 
@@ -102,6 +104,11 @@ public class VehicleBusCAN {
         // close any prior socket that still exists
         stop(); // stop any threads and sockets already running
 
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
         if (busWrapper.isUnitTesting) {
             // since we are unit testing and not on realy device, even creating the CanbusInterface will fail fatally,
@@ -129,7 +136,10 @@ public class VehicleBusCAN {
             // we know that this bitrate works since we've already used this bitrate
             // put our sockets into read & write mode
             busWrapper.setCharacteristics(false, initial_bitrate, hardwareFilters, canNumber, flowControls);// Todo: Added canNumber, monitor this one and make sure it works.
-            busWrapper.start(BUS_NAME, busReadyReadWriteCallback, null);
+            if (!busWrapper.start(BUS_NAME, busReadyReadWriteCallback, null)) {
+                Log.e(TAG, "Error starting bus with bus wrapper.");
+                return false;
+            }
         } else {
             // Unconfirmed mode
 
@@ -138,7 +148,10 @@ public class VehicleBusCAN {
             clearConfirmedBitRate(); // erase any prior confirmations of bitrate
             clearConfirmedCanNumber();
             busWrapper.setCharacteristics(true, initial_bitrate, hardwareFilters, canNumber, flowControls);
-            busWrapper.start(BUS_NAME, busReadyReadOnlyCallback, null);
+            if (!busWrapper.start(BUS_NAME, busReadyReadOnlyCallback, null)) {
+                Log.e(TAG, "Error starting bus with bus wrapper.");
+                return false;
+            }
         }
 
 
@@ -338,7 +351,15 @@ public class VehicleBusCAN {
         return busWrapper.getCANBitrate();
     }
 
-
+    public int getCanNumber() {
+        if (busWrapper != null) {
+            VehicleBusHW.CANSocket socket = busWrapper.getCANSocket();
+            if (socket != null) {
+                return socket.canNumber;
+            }
+        }
+        return -1;
+    }
 
 
 

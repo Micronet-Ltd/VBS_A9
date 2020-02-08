@@ -14,17 +14,24 @@
 
 package com.micronet.dsc.vbs;
 
+import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.SystemClock;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.NotificationCompat;
 
 import java.util.ArrayList;
+
+import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 
 public class VehicleBusService extends Service {
 
@@ -34,7 +41,7 @@ public class VehicleBusService extends Service {
     private static final int NOTFICATION_ID = 444444;
     private static final String APP_NAME = "VBS";
     private static final String VBS_CHANNEL_DESCRIPTION = "VBS description channel.";
-    private static final String VBS_NOTIFICATION_DESCRIPTION = "is running";
+    private static final String VBS_NOTIFICATION_DESCRIPTION = "is starting...";
     private static final String CHANNEL_ID = "com.micronet.dsc.vbs_notifications";
     private static final String CAN_LABEL = "CAN";
     private static final String J1708_LABEL = "J1708";
@@ -57,6 +64,10 @@ public class VehicleBusService extends Service {
     boolean hasStartedJ1708 = false;
     boolean isUnitTesting = false;
 
+    static VehicleBusService service = null;
+
+    public static boolean sentPermissionRequest = false;
+
     public VehicleBusService() {
     }
 
@@ -71,10 +82,31 @@ public class VehicleBusService extends Service {
         Log.i(TAG, "Service Created: VBS device=" + BuildConfig.BUILD_DEVICE + " version=" + BuildConfig.VERSION_NAME);
         processId = android.os.Process.myPid();
         mainHandler  = new Handler();
+        service = this;
+    }
+
+    private boolean arePermissionsGranted() {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // Check to make sure config file can be read.
+        if (!arePermissionsGranted() && !sentPermissionRequest) {
+            // Start activity to request for permissions.
+            // This should only happen once per install.
+            sentPermissionRequest = true;
+            intent.setClass(this, VehicleBusActivity.class);
+            intent.setFlags(FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+            Log.d(TAG, "Sending request to check for permissions.");
+            stopSelf();
+            return START_NOT_STICKY;
+        } else if (!arePermissionsGranted()) {
+            Log.d(TAG, "Permissions are still waiting to be granted.");
+            stopSelf();
+            return START_NOT_STICKY;
+        }
 
         // If intent is null, then load from file.
         if (intent == null) {
@@ -131,6 +163,11 @@ public class VehicleBusService extends Service {
                 ArrayList<VehicleBusHW.CANFlowControl> flowControls = null;
                 if (flowControl) {
                     flowControls = Config.getFlowControls(canNumber);
+                    if (flowControls != null) {
+                        Log.d(TAG, "Using flow controls from configuration.xml.");
+                    } else {
+                        Log.d(TAG, "Flow controls are null.");
+                    }
                 }
 
                 // Remember Canbus settings.
@@ -361,7 +398,10 @@ public class VehicleBusService extends Service {
             my_can.setConfirmedCanNumber(canNumber);
         }
 
-        my_can.start(bitrate, auto_detect, canHardwareFilters, canNumber, flowControls);
+        if (!my_can.start(bitrate, auto_detect, canHardwareFilters, canNumber, flowControls)) {
+            Log.e(TAG, "Error starting bus with bus wrapper.");
+            return;
+        }
 
 /*
         // now we need to restart J1708 again if we previously stopped it
@@ -411,6 +451,20 @@ public class VehicleBusService extends Service {
 
     } // stopCAN()
 
+    void forceStopCAN() {
+
+        // remove callbacks first in case the stop() jams
+        if (!isAnythingElseOn(VBUS_CAN)) {
+            mainHandler.removeCallbacks(statusTask);
+        }
+
+        if (my_can != null) {
+            my_can.stop();
+        }
+
+        hasStartedCAN = false;
+
+    } // forceStopCAN()
 
     ////////////////////////////////////////////////////////////////
     // saveJ1708()
@@ -542,8 +596,10 @@ public class VehicleBusService extends Service {
     /**
      * Update notification description.
      */
-    void updateForegroundNotification(String description) {
+    void updateForegroundNotification(String description, int color, int priority) {
         builder.setContentText(description);
+        builder.setColor(color);
+        builder.setPriority(priority);
         notificationManager.notify(NOTFICATION_ID, builder.build());
     }
 
@@ -579,6 +635,7 @@ public class VehicleBusService extends Service {
             ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANRX, my_can.isReadReady());
             ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANTX, my_can.isWriteReady());
             ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANBITRATE, my_can.getBitrate());
+            ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANNUMBER, my_can.getCanNumber());
         }
 
         if (my_j1708 != null) { // safety
