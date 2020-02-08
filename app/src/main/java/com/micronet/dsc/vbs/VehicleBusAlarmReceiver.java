@@ -23,8 +23,7 @@ public class VehicleBusAlarmReceiver extends BroadcastReceiver {
             // Send intent to service (and start if needed)
             Intent i = new Intent(context, VehicleBusService.class);
             i.setAction(VehicleBusConstants.SERVICE_ACTION_START);
-            context.startService(i);
-            //startWakefulService(context, i); // wakeful to make sure we don't power down before
+            context.startForegroundService(i);
         }
     }
 }

@@ -7,6 +7,13 @@ package com.micronet.dsc.vbs;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.text.TextUtils;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * State contains saved state information flags.
@@ -25,14 +32,19 @@ public class State {
     public static final int CAN_FILTER_MASKS = 205;
     public static final int FLAG_CAN_AUTODETECT = 206;
     public static final int CAN_CONFIRMED_BITRATE = 207;    // prior bitrate that was confirmed (so we don't need listen only)
+    public static final int CAN_CONFIRMED_NUMBER = 208;
+    public static final int CAN_NUMBER = 209;
     public static final int FLAG_J1708_ON = 210;
+    public static final int CAN_FLOW_CONTROLS = 211;
 
     Context context;
     SharedPreferences sharedPref;
+    Gson gson;
 
     public State(Context context) {
         this.context = context;
         sharedPref = context.getSharedPreferences(FILENAMEKEY, Context.MODE_PRIVATE);
+        gson = new Gson();
     }
 
     /**
@@ -102,6 +114,41 @@ public class State {
         }
 
         return true;
+    }
+
+    /**
+     * Writes a Flow Control Array for the given state setting. Returns true if successful, else false.
+     */
+    public boolean writeStateFlowControls(final ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
+        try {
+            SharedPreferences.Editor editor = sharedPref.edit();
+            if (flowControls == null) {
+                editor.putString(Integer.toString(CAN_FLOW_CONTROLS), "");
+            } else {
+                String objStr = gson.toJson(flowControls);
+                editor.putString(Integer.toString(CAN_FLOW_CONTROLS), objStr);
+            }
+
+            editor.commit();
+        } catch (Exception e) {
+            Log.e(TAG, "Exception: writeStateFlowControls() " + e.toString(), e);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Returns an String value for the given state. If state doesn't exist, returns "".
+     */
+    public ArrayList<VehicleBusHW.CANFlowControl> readStateFlowControls() {
+        String jsonStr = sharedPref.getString(Integer.toString(CAN_FLOW_CONTROLS), "");
+
+        if (!TextUtils.isEmpty(jsonStr)) {
+            return gson.fromJson(jsonStr, new TypeToken<List<VehicleBusHW.CANFlowControl>>(){}.getType());
+        } else {
+            return null;
+        }
     }
 
     /**

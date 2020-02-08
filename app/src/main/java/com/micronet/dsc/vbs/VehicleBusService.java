@@ -14,48 +14,59 @@
 
 package com.micronet.dsc.vbs;
 
+import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.SystemClock;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.NotificationCompat;
 
+import java.util.ArrayList;
 
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicBoolean;
-
+import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 
 public class VehicleBusService extends Service {
 
     public static final String TAG = "ATS-VBS";
-
     public static final int BROADCAST_STATUS_DELAY_MS = 1000; // every 1 s
+
+    private static final int NOTFICATION_ID = 444444;
+    private static final String APP_NAME = "VBS";
+    private static final String VBS_CHANNEL_DESCRIPTION = "VBS description channel.";
+    private static final String VBS_NOTIFICATION_DESCRIPTION = "is starting...";
+    private static final String CHANNEL_ID = "com.micronet.dsc.vbs_notifications";
+    private static final String CAN_LABEL = "CAN";
+    private static final String J1708_LABEL = "J1708";
+
+    private NotificationManager notificationManager;
+    private NotificationCompat.Builder builder;
 
     // These are the possible buses that are monitored here
     static final int VBUS_CAN = 1;
     static final int VBUS_J1708 = 2;
 
-    int processId = 0;
-    boolean hasStartedCAN = false;
-    boolean hasStartedJ1708 = false;
-
+    static int processId = 0;
+    static int CAN_NUMBER = 0;
 
     Handler mainHandler = null;
-
     VehicleBusJ1708 my_j1708;
     VehicleBusCAN my_can;
 
+    boolean hasStartedCAN = false;
+    boolean hasStartedJ1708 = false;
     boolean isUnitTesting = false;
 
-    public static final String APP_NAME = "VBS";
-    public static final String VBS_CHANNEL_DESCRIPTION = "VBS description channel.";
-    public static final String VBS_NOTIFICATION_DESCRIPTION = "is running";
-    public static final String CHANNEL_ID = "com.micronet.dsc.vbs_notifications";
+    static VehicleBusService service = null;
+
+    public static boolean sentPermissionRequest = false;
 
     public VehicleBusService() {
     }
@@ -66,83 +77,120 @@ public class VehicleBusService extends Service {
         throw new UnsupportedOperationException("Not yet implemented");
     }
 
-
     @Override
     public void onCreate() {
-        android.util.Log.i(TAG, "Service Created: VBS device=" + BuildConfig.BUILD_DEVICE + " version=" + BuildConfig.VERSION_NAME);
+        Log.i(TAG, "Service Created: VBS device=" + BuildConfig.BUILD_DEVICE + " version=" + BuildConfig.VERSION_NAME);
         processId = android.os.Process.myPid();
         mainHandler  = new Handler();
+        service = this;
+    }
+
+    private boolean arePermissionsGranted() {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-
-        String bus;
-        String action;
-        if (intent == null) {
-            // load up our saved settings from file and use those
-            if (!startFromFile()) return START_NOT_STICKY;
+        // Check to make sure config file can be read.
+        if (!arePermissionsGranted() && !sentPermissionRequest) {
+            // Start activity to request for permissions.
+            // This should only happen once per install.
+            sentPermissionRequest = true;
+            intent.setClass(this, VehicleBusActivity.class);
+            intent.setFlags(FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+            Log.d(TAG, "Sending request to check for permissions.");
+            stopSelf();
             return START_NOT_STICKY;
-        } // intent was null .. load from file
+        } else if (!arePermissionsGranted()) {
+            Log.d(TAG, "Permissions are still waiting to be granted.");
+            stopSelf();
+            return START_NOT_STICKY;
+        }
 
-        action = intent.getAction();
-        if (action.equals(VehicleBusConstants.SERVICE_ACTION_RESTART)) {
-            android.util.Log.i(TAG, "Vehicle Bus Service Restarting");
+        // If intent is null, then load from file.
+        if (intent == null) {
             if (!startFromFile()) return START_NOT_STICKY;
             return START_NOT_STICKY;
         }
 
-        bus = intent.getStringExtra(VehicleBusConstants.SERVICE_EXTRA_BUS);
+        // Check if action is null.
+        String action = intent.getAction();
+        if (action == null) {
+            Log.e(TAG, "Error, an action is required for service.");
+            return START_NOT_STICKY;
+        }
+
+        // If action is to restart then load from file.
+        if (action.equals(VehicleBusConstants.SERVICE_ACTION_RESTART)) { // TODO Errors here with ATS in some cases.
+            Log.i(TAG, "Vehicle Bus Service Restarting");
+            setForeground(); // TODO do we need this here? Does it cause issues having it here?
+            if (!startFromFile()) return START_NOT_STICKY;
+            return START_NOT_STICKY;
+        }
+
+        // Check if bus is null.
+        String bus = intent.getStringExtra(VehicleBusConstants.SERVICE_EXTRA_BUS);
         if (bus == null) {
-            Log.e(TAG, "cannot start/stop service. must designate bus");
+            Log.e(TAG, "Error, cannot start/stop service. Must designate bus extra.");
             return START_NOT_STICKY;
         }
 
         if (action.equals(VehicleBusConstants.SERVICE_ACTION_START)) {
-            android.util.Log.i(TAG, "Vehicle Bus Service Starting: " + bus);
+            Log.i(TAG, "Vehicle Bus Service Starting: " + bus);
             setForeground();
 
-            // if bus is J1708, then filter out all CAN messages so we don't get any before starting.
-            if (bus.equals("J1708")) {
-                // remember that this was our last request
+            // If bus is J1708, then filter out all CAN messages so we don't get any before starting.
+            if (bus.equals(J1708_LABEL)) {
+                // Remember J1708.
                 saveJ1708(true);
 
                 stopJ1708(false);
                 startJ1708();
-            }
-            else
-            if (bus.equals("CAN")) {
+            } else if (bus.equals(CAN_LABEL)) {
+                // Get all extras from broadcast.
                 int bitrate = intent.getIntExtra(VehicleBusConstants.SERVICE_EXTRA_BITRATE, VehicleBusCAN.DEFAULT_BITRATE);
                 boolean auto_detect = intent.getBooleanExtra(VehicleBusConstants.SERVICE_EXTRA_AUTODETECT, false);
                 boolean skip_verify = intent.getBooleanExtra(VehicleBusConstants.SERVICE_EXTRA_SKIPVERIFY, false);
-
+                boolean flowControl = intent.getBooleanExtra(VehicleBusConstants.SERVICE_EXTRA_FLOW_CONTROL, false);
+                int canNumber = intent.getIntExtra(VehicleBusConstants.SERVICE_EXTRA_CAN_NUMBER, VehicleBusCAN.DEFAULT_CAN_NUMBER);
                 int[] ids = intent.getIntArrayExtra(VehicleBusConstants.SERVICE_EXTRA_HARDWAREFILTER_IDS);
                 int[] masks = intent.getIntArrayExtra(VehicleBusConstants.SERVICE_EXTRA_HARDWAREFILTER_MASKS);
 
-                // remember that this was our last request
-                saveCAN(true, bitrate, auto_detect, ids, masks);
+                CAN_NUMBER = canNumber; // Setting the CAN_NUMBER to match the canNumber, this is used for other classes
+                Log.d(TAG, "CAN_NUMBER = " + CAN_NUMBER);
 
-                // and do it
+                ArrayList<VehicleBusHW.CANFlowControl> flowControls = null;
+                if (flowControl) {
+                    flowControls = Config.getFlowControls(canNumber);
+                    if (flowControls != null) {
+                        Log.d(TAG, "Using flow controls from configuration.xml.");
+                    } else {
+                        Log.d(TAG, "Flow controls are null.");
+                    }
+                }
+
+                // Remember Canbus settings.
+                saveCAN(true, bitrate, auto_detect, ids, masks, canNumber, flowControls);
+
+                // Start Canbus.
                 stopCAN(false);
-                startCAN(bitrate, skip_verify, auto_detect, ids, masks, false);
+                startCAN(bitrate, skip_verify, auto_detect, ids, masks, canNumber,false, flowControls);
             }
-
         } else if (action.equals(VehicleBusConstants.SERVICE_ACTION_STOP)) {
-            android.util.Log.i(TAG, "Vehicle Bus Service Stopped: " + bus);
+            Log.i(TAG, "Vehicle Bus Service Stopped: " + bus);
 
             // ignore J1708 requests for now, J1708 is stopped same time as CAN
-            if (bus.equals("CAN")) {
+            if (bus.equals(CAN_LABEL)) {
 
-                saveCAN(false, 0, false, null, null);
+                saveCAN(false, 0, false, null, null, 0, null); // Todo: addCanBus. Ask about this, do I need anything else to tell the service to close canPort?
                 if (!isAnythingElseOn(VBUS_CAN)) {
                     setBackground();
                     stopSelf(); // nothing on, stop everything and exit
                 } else {
                     stopCAN(true); // just stop the CAN
                 }
-            }
-            else
-            if (bus.equals("J1708")) {
+            } else if (bus.equals(J1708_LABEL)) {
                 saveJ1708(false);
 
                 if (!isAnythingElseOn(VBUS_J1708)) {
@@ -167,83 +215,59 @@ public class VehicleBusService extends Service {
         //  if ths system needs RAM quickly
         //  if the user force-stops the application
 
-        android.util.Log.v(TAG, "Destroying Service");
+        Log.v(TAG, "Destroying Service");
         stopJ1708(false);
         stopCAN(false);
-
     } // OnDestroy()
 
-    //////////////////////////////////////////////////////////////////
-    // setForeground()
-    //  move the service to the foreground and display the icon
-    //////////////////////////////////////////////////////////////////
-    void setForeground() {
-        NotificationChannel notificationChannel = new NotificationChannel(CHANNEL_ID, APP_NAME, NotificationManager.IMPORTANCE_DEFAULT);
-        notificationChannel.setDescription(VBS_CHANNEL_DESCRIPTION);
-        NotificationManager notificationManager = getSystemService(NotificationManager.class);
-        notificationManager.createNotificationChannel(notificationChannel);
-
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(APP_NAME)
-                .setContentText(VBS_NOTIFICATION_DESCRIPTION)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setContentIntent(null);
-
-        startForeground(444444, builder.build());
-        Log.d(TAG, "VBS set to foreground.");
-    }
-
-    private void setBackground() {
-        stopForeground(true); // true = remove notification
-    }
-
-    ////////////////////////////////////////////////////////////////
-    // startFromFile()
-    //  start up the buses based on saved state information
-    //  return true if this was successful, false if there was a problem
-    ////////////////////////////////////////////////////////////////
+    /**
+     * Start up the buses based on saved state information.
+     * @return true if this was successful, false if there was a problem.
+     */
     boolean startFromFile() {
-        android.util.Log.i(TAG, "Vehicle Bus Service Starting: (From Saved File)" );
+        Log.i(TAG, "Vehicle Bus Service Starting: (From Saved File)" );
 
         State state = new State(getApplicationContext());
-
         boolean enCan = state.readStateBool(State.FLAG_CAN_ON) ;
         boolean enJ1708 = state.readStateBool(State.FLAG_J1708_ON);
 
+        // Check if both engines are off.
         if ((!enCan) && (!enJ1708)) {
-            android.util.Log.i(TAG, "All buses are set to off. stopping service");
+            Log.i(TAG, "All buses are set to off. stopping service");
             stopSelf(); // nothing on, stop everything and exit
         }
 
         // first, try to stop all running buses at the same time
         stopAll();
 
-        if (enCan) { // enable CAN bus .. always do this before J1708 to prevent re-creating CAN bus when starting J1708
+        // Enable Canbus. Always do this before J1708 to prevent re-creating CAN bus when starting J1708.
+        if (enCan) {
+            // Read all saved state configurations of port.
             int bitrate = state.readState(State.CAN_BITRATE);
             if (bitrate == 0) bitrate = VehicleBusCAN.DEFAULT_BITRATE;
             boolean auto_detect = state.readStateBool(State.FLAG_CAN_AUTODETECT);
-
+            int canNumber = state.readState(State.CAN_NUMBER);
             String idstring = state.readStateString(State.CAN_FILTER_IDS);
             String maskstring = state.readStateString(State.CAN_FILTER_MASKS);
 
             String[] idsplits = idstring.split(",");
             String[] masksplits = maskstring.split(",");
 
-            int ids[] = new int[idsplits.length];
-            int masks[] = new int[masksplits.length];
-
+            int[] ids = new int[idsplits.length];
+            int[] masks = new int[masksplits.length];
             for (int i=0; i < idsplits.length && i < masksplits.length; i++) {
                 try {
                     ids[i] = Integer.parseInt(idsplits[i]);
                     masks[i] = Integer.parseInt(masksplits[i]);
                 } catch (Exception e) {
-                    Log.e(TAG, "CAN Masks or IDs are not a number!. Aborting start.");
+                    Log.e(TAG, "CAN Masks or IDs are not a number! Aborting start.");
                     return false; // we can't start, not sure what to do, we don't want to start without any filters
                 }
             }
 
-            startCAN(bitrate, false, auto_detect, ids, masks, true);
+            ArrayList<VehicleBusHW.CANFlowControl> flowControls = state.readStateFlowControls();
+
+            startCAN(bitrate, false, auto_detect, ids, masks, canNumber,true, flowControls);
         }
 
         if (enJ1708) { // enable J1708 bus now b/c it can get tacked onto CAN.
@@ -253,13 +277,9 @@ public class VehicleBusService extends Service {
         return true;
     } // startFromFile()
 
-
-
-
-    ////////////////////////////////////////////////////////////////
-    // isAnythingElseOn()
-    //  returns true if any other bus is on, other than the one specified
-    ////////////////////////////////////////////////////////////////
+    /**
+     * @return true if any other bus is on, other than the one specified.
+     */
     boolean isAnythingElseOn(int bus) {
         switch (bus) {
             case VBUS_CAN:
@@ -271,14 +291,12 @@ public class VehicleBusService extends Service {
         }
     } // isAnythingElseOn()
 
-
     ////////////////////////////////////////////////////////////////
     // stopAll()
     //  stop both the CAN and the J1708 bus if they are running
     //  this is more efficient than the stopCAN() or stopJ1708() if we know that we will be stopping both buses at the same time.
     ////////////////////////////////////////////////////////////////
     void stopAll() {
-
         // call the underlying wrapper's stopAll()
 
         // my_can or my_j1708 is only used to provide us access to the underlying wrapper stopAll() call
@@ -286,35 +304,29 @@ public class VehicleBusService extends Service {
 
         if (my_can != null) {
             my_can.stopAll();
-        }
-        else
-        if (my_j1708 != null) {
+        } else if (my_j1708 != null) {
             my_j1708.stopAll();
         }
 
         // stop all buses
         stopJ1708(true);
         stopCAN(true);
-
     } //stopAll()
-
 
     ////////////////////////////////////////////////////////////////
     // saveCAN()
     // save CAN information to file so we can load it up on restart.
     ////////////////////////////////////////////////////////////////
-    void saveCAN(boolean enabled, int bitrate, boolean auto_detect, int[] ids, int masks[]) {
+    void saveCAN(boolean enabled, int bitrate, boolean auto_detect, int[] ids, int masks[], int canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
         Context context = getApplicationContext();
-
-        State state;
-        state = new State(context);
+        State state = new State(context);
 
         state.writeState(State.FLAG_CAN_ON, ( enabled ?  1 : 0));
-
         if (enabled) {
-            // save more info about the CAN
+            // Save more info about the CAN.
             state.writeState(State.CAN_BITRATE, bitrate);
             state.writeState(State.FLAG_CAN_AUTODETECT, (auto_detect ? 1 : 0));
+            state.writeState(State.CAN_NUMBER, canNumber);
 
             String idstring = "";
             String maskstring = "";
@@ -335,9 +347,9 @@ public class VehicleBusService extends Service {
             }
             state.writeStateString(State.CAN_FILTER_IDS, idstring);
             state.writeStateString(State.CAN_FILTER_MASKS, maskstring);
+            state.writeStateFlowControls(flowControls);
         }
     }
-
 
     ////////////////////////////////////////////////////////////////
     // startCAN()
@@ -350,7 +362,7 @@ public class VehicleBusService extends Service {
     //  load_last_confirmed: whether or not we should load the last confirmed bitrate from file
     //      when service receives the "restart" action, then we will load this from file, otherwise we only use what is in memory
     ////////////////////////////////////////////////////////////////
-    void startCAN(int bitrate, boolean skip_verify, boolean auto_detect, int[] ids, int masks[], boolean load_last_confirmed) {
+    void startCAN(int bitrate, boolean skip_verify, boolean auto_detect, int[] ids, int masks[], int canNumber, boolean load_last_confirmed, ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
         Log.d(TAG, "+startCAN():");
 
         if (hasStartedCAN) {
@@ -375,15 +387,21 @@ public class VehicleBusService extends Service {
 
         my_can = new VehicleBusCAN(context, isUnitTesting);
 
-        if (load_last_confirmed)
+        if (load_last_confirmed) {
             my_can.loadConfirmedBitRate();
+            my_can.loadConfirmedCanNumber();
+        }
 
         if (skip_verify) {
             // we've requested to treat this bitrate as confirmed
             my_can.setConfirmedBitRate(bitrate);
+            my_can.setConfirmedCanNumber(canNumber);
         }
 
-        my_can.start(bitrate, auto_detect, canHardwareFilters);
+        if (!my_can.start(bitrate, auto_detect, canHardwareFilters, canNumber, flowControls)) {
+            Log.e(TAG, "Error starting bus with bus wrapper.");
+            return;
+        }
 
 /*
         // now we need to restart J1708 again if we previously stopped it
@@ -433,6 +451,20 @@ public class VehicleBusService extends Service {
 
     } // stopCAN()
 
+    void forceStopCAN() {
+
+        // remove callbacks first in case the stop() jams
+        if (!isAnythingElseOn(VBUS_CAN)) {
+            mainHandler.removeCallbacks(statusTask);
+        }
+
+        if (my_can != null) {
+            my_can.stop();
+        }
+
+        hasStartedCAN = false;
+
+    } // forceStopCAN()
 
     ////////////////////////////////////////////////////////////////
     // saveJ1708()
@@ -509,8 +541,6 @@ public class VehicleBusService extends Service {
 
     } // stopJ1708()
 
-
-
     ///////////////////////////////////////////////////////////////
     // createCombinedFilters()
     //  take the ids and masks passed to this and combine into CanBusHardwareFilter
@@ -537,6 +567,48 @@ public class VehicleBusService extends Service {
 
     } // createCombinedFilters()
 
+    ////////////////////////////////////////////
+    ////////////////////////////////////////////
+    ///////// Notification Functions ///////////
+    ////////////////////////////////////////////
+    ////////////////////////////////////////////
+
+    /**
+     * Move service to the foreground and display icon.
+     */
+    void setForeground() {
+        NotificationChannel notificationChannel = new NotificationChannel(CHANNEL_ID, APP_NAME, NotificationManager.IMPORTANCE_DEFAULT);
+        notificationChannel.setDescription(VBS_CHANNEL_DESCRIPTION);
+        notificationManager = getSystemService(NotificationManager.class);
+        notificationManager.createNotificationChannel(notificationChannel);
+
+        builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(APP_NAME)
+                .setContentText(VBS_NOTIFICATION_DESCRIPTION)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(null);
+
+        startForeground(NOTFICATION_ID, builder.build());
+        Log.d(TAG, "VBS set to foreground.");
+    }
+
+    /**
+     * Update notification description.
+     */
+    void updateForegroundNotification(String description, int color, int priority) {
+        builder.setContentText(description);
+        builder.setColor(color);
+        builder.setPriority(priority);
+        notificationManager.notify(NOTFICATION_ID, builder.build());
+    }
+
+    /**
+     * Move service to the background and remove icon.
+     */
+    private void setBackground() {
+        stopForeground(true); // true = remove notification
+    }
 
     ///////////////////////////////////////////////////////////////
     // broadcastStatus()
@@ -563,6 +635,7 @@ public class VehicleBusService extends Service {
             ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANRX, my_can.isReadReady());
             ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANTX, my_can.isWriteReady());
             ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANBITRATE, my_can.getBitrate());
+            ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANNUMBER, my_can.getCanNumber());
         }
 
         if (my_j1708 != null) { // safety

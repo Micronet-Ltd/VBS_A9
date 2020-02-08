@@ -15,13 +15,10 @@ package com.micronet.dsc.vbs;
 import android.os.Handler;
 import android.os.Looper;
 
-
-import com.micronet.canbus.CanbusInterface;
-import com.micronet.canbus.CanbusSocket;
-
-
 import java.util.ArrayList;
 import java.util.Iterator;
+
+import static com.micronet.dsc.vbs.VehicleBusService.service;
 
 
 /**
@@ -30,7 +27,7 @@ import java.util.Iterator;
 public class VehicleBusWrapper extends VehicleBusHW {
     public static final String TAG = "ATS-VBS-Wrap";
 
-
+    static int canNumber;
     static boolean isUnitTesting = true; // we don't actually open sockets when unit testing
 
 
@@ -111,10 +108,10 @@ public class VehicleBusWrapper extends VehicleBusHW {
     // setCharacteristics()
     //  set details for the CAN, call this before starting a CAN bus
     //////////////////////////////////////////////////
-    public boolean setCharacteristics(boolean listen_only, int bitrate, CANHardwareFilter[] hwFilters) {
+    public boolean setCharacteristics(boolean listen_only, int bitrate, CANHardwareFilter[] hwFilters, int canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControls) { // Todo: Should I include canNumber in here? since I
 
         // will take effect on the next bus stop/start cycle
-        busSetupRunnable.setCharacteristics(listen_only, bitrate, hwFilters);
+        busSetupRunnable.setCharacteristics(listen_only, bitrate, hwFilters, canNumber, flowControls);
         return true;
     } // setCharacteristics()
 
@@ -200,7 +197,9 @@ public class VehicleBusWrapper extends VehicleBusHW {
         }
 
         // since we haven't already, we should set-up now
-        busSetupRunnable.setup();
+        if (!busSetupRunnable.setup()) {
+            return false;
+        }
 
 
         return true;
@@ -310,6 +309,13 @@ public class VehicleBusWrapper extends VehicleBusHW {
         if (busSetupRunnable != null)
             busSetupRunnable.teardown();
 
+        // Sleep to avoid filter dropping issue.
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
         if (busSetupRunnable != null) {
             busSetupRunnable.setup(); // this will also call callback array
         }
@@ -338,7 +344,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
     public CANSocket getCANSocket() {
         if (busSetupRunnable == null) return null; // never even created
         if (!busSetupRunnable.isSetup()) return null; // no valid socket
-        return new CANSocket(busSetupRunnable.setupSocket);
+        return new CANSocket(busSetupRunnable.setupSocket, busSetupRunnable.canNumber);
     } // getCANSocket()
 
 
@@ -472,7 +478,9 @@ public class VehicleBusWrapper extends VehicleBusHW {
 
         boolean listen_only = true; // default listen_only
         int bitrate = 250000; // default bit rate
+        int canNumber = 2;
         CANHardwareFilter[] hardwareFilters = null;
+        ArrayList<VehicleBusHW.CANFlowControl> flowControls;
 
 
         BusSetupRunnable() {
@@ -486,11 +494,13 @@ public class VehicleBusWrapper extends VehicleBusHW {
 
 
 
-        public void setCharacteristics(boolean new_listen_only, int new_bitrate, CANHardwareFilter[] new_hardwareFilters) {
+        public void setCharacteristics(boolean new_listen_only, int new_bitrate, CANHardwareFilter[] new_hardwareFilters, int new_canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControlsArr) {
             // these take effect at next Setup()
             listen_only = new_listen_only;
             bitrate = new_bitrate;
             hardwareFilters = new_hardwareFilters;
+            canNumber = new_canNumber;
+            flowControls = flowControlsArr;
         }
 
 
@@ -506,6 +516,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
             // these take effect at next Setup()
             listen_only = true;
             bitrate = 250000;
+            canNumber = 2;
             setDefaultFilters(); // block everything
         }
 
@@ -515,8 +526,8 @@ public class VehicleBusWrapper extends VehicleBusHW {
         }
 
         // setup() : External call to setup the bus
-        public void setup() {
-            doInternalSetup();
+        public boolean setup() {
+            boolean result = doInternalSetup();
 
 
             /*
@@ -524,12 +535,13 @@ public class VehicleBusWrapper extends VehicleBusHW {
             Thread setupThread = new Thread(busSetupRunnable);
             setupThread.start();
             */
+            return result;
         }
 
         // teardown () : External call to teardown the bus
         public void teardown() {
 
-            doInternalTeardown();
+            doInternalTeardown(canNumber);
 
             // do the teardown in a separate thread:
             // cancelThread = true;
@@ -541,15 +553,17 @@ public class VehicleBusWrapper extends VehicleBusHW {
         //  does all setup steps
         //  returns true if setup was successful, otherwise false
         ///////////////////////////////////////////
-        boolean doInternalSetup() {
-            setupInterface = createInterface(listen_only, bitrate, hardwareFilters);
-            if (setupInterface == null) return false;
-
+        boolean doInternalSetup() { // Todo: deleted parameter-canNumber. This method should be getting it from the global.
+            setupInterface = createInterface(canNumber, listen_only, bitrate, hardwareFilters, flowControls); /**Stage 1: Create interface**/
+            if (setupInterface == null) {
+                service.forceStopCAN();
+                return false;
+            }
 
             Log.v(TAG, "creating socket");
-            setupSocket = createSocket(setupInterface);
+            setupSocket = createSocket(canNumber, setupInterface); /**Stage 2: Create Socket**/
             if (setupSocket == null) {
-                removeInterface(setupInterface);
+                removeInterface(canNumber, setupInterface);
                 isClosed = true;
                 return false;
             }
@@ -560,8 +574,8 @@ public class VehicleBusWrapper extends VehicleBusHW {
             //      may be switching bitrates (unless we are only starting J1708, in which case only downside
             //      is it takes 3 seconds longer than it otherwise would to start getting packets).
 
-            if (!openSocket(setupSocket, listen_only)) {
-                removeInterface(setupInterface);
+            if (!openSocket(canNumber, setupSocket, listen_only)) {
+                removeInterface(canNumber, setupInterface);
                 isClosed = true;
                 return false;
             }
@@ -580,17 +594,17 @@ public class VehicleBusWrapper extends VehicleBusHW {
         // doInternalTeardown()
         //  does all teardown steps
         /////////////////////////////////////////////
-        void doInternalTeardown() {
+        void doInternalTeardown(int canNumber) {
 
 
 
             if (setupSocket != null)
-                closeSocket(setupSocket);
+                closeSocket(canNumber, setupSocket);
 
             setupSocket = null;
 
             if (setupInterface != null)
-                removeInterface(setupInterface);
+                removeInterface(canNumber, setupInterface);
 
             setupInterface = null;
 
@@ -627,7 +641,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
 
             Log.v(TAG, "Setup thread terminating");
 
-            doInternalTeardown();
+            doInternalTeardown(canNumber);
 
             Log.v(TAG, "Setup thread terminated");
             isClosed = true;

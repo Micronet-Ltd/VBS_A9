@@ -161,7 +161,10 @@ public class VehicleBusJ1708 {
 */
 
         // bus characteristics were already set when we started J1939
-        busWrapper.start(BUS_NAME, busReadyCallback, null);
+        if (!busWrapper.start(BUS_NAME, busReadyCallback, null)) {
+            Log.e(TAG, "Error starting bus with bus wrapper.");
+            return false;
+        }
 
         try {
             IntentFilter intentFilter = new IntentFilter();
