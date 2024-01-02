@@ -5,7 +5,7 @@
 package com.micronet.dsc.vbs;
 
 import android.graphics.Color;
-import android.support.v4.app.NotificationCompat;
+import androidx.core.app.NotificationCompat;
 
 import com.micronet.canbus.CanbusException;
 import com.micronet.canbus.CanbusFilter;
