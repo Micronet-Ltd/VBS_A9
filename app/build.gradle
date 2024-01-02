@@ -8,10 +8,6 @@ android {
     buildFeatures{
         buildConfig = true
     }
-    signingConfigs {
-        tab8keys
-        obc5keys
-    }
 
     defaultConfig {
         applicationId "com.micronet.dsc.vbs"

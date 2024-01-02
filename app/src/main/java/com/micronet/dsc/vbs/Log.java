@@ -19,14 +19,14 @@ public class Log {
     // Info, Warnings, and Errors are always recorded.
 
     //public static String logTags[] = {"ATS-Service", "ATS-Power", "ATS-Queue", "ATS-Engine", "ATS-J1939", "ATS-CAN", "ATS-J1587"};
-    public static String logTags[] = {"*"};
+    public static String[] logTags = {"*"};
 
     public static LogCallbackInterface callbackInterface;
-    public static String callbackTags[] = {"*"};
-    public static String callbackLevels[] = {"i", "w", "e"};
+    public static String[] callbackTags = {"*"};
+    public static String[] callbackLevels = {"i", "w", "e"};
 
     public interface LogCallbackInterface {
-        public void show(String tag, String text);
+        void show(String tag, String text);
     }
 
     public static void vv(final String TAG, final String TEXT) { // Extra verbose
@@ -104,9 +104,9 @@ public class Log {
     }
 
     public static boolean allowTag(String tag) {
-        for (int i = 0; i < logTags.length; i++) {
-            if (logTags[i].equals("*")) return true; // asterisk means accept all
-            if (logTags[i].equalsIgnoreCase(tag)) return true;
+        for (String logTag : logTags) {
+            if (logTag.equals("*")) return true; // asterisk means accept all
+            if (logTag.equalsIgnoreCase(tag)) return true;
         }
 
         return false;
@@ -135,7 +135,7 @@ public class Log {
         byte[] bytes = new byte[hex.length() / 2];
         int i;
         for (i = 0; i < hex.length() - 1; i += 2) {
-            int cp = (int) hex.codePointAt(i);
+            int cp = hex.codePointAt(i);
             cp &= 0xFF; // no funny business
             if (cp >= 0x41) cp -= 7;
             cp -= 0x30;

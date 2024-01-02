@@ -63,7 +63,7 @@ public class State {
             editor.putInt(Integer.toString(state_id), new_value);
             editor.commit();
         } catch (Exception e) {
-            Log.e(TAG, "Exception: writeState() " + e.toString(), e);
+            Log.e(TAG, "Exception: writeState() " + e, e);
         }
         return true;
     }
@@ -80,7 +80,7 @@ public class State {
             editor.putString(Integer.toString(state_id), newString);
             editor.commit();
         } catch (Exception e) {
-            Log.e(TAG, "Exception: writeStateArray() " + e.toString(), e);
+            Log.e(TAG, "Exception: writeStateArray() " + e, e);
         }
         return true;
     }
@@ -94,7 +94,7 @@ public class State {
             editor.putLong(Integer.toString(state_id), new_value);
             editor.commit();
         } catch (Exception e) {
-            Log.e(TAG, "Exception: writeStateLong() " + e.toString(), e);
+            Log.e(TAG, "Exception: writeStateLong() " + e, e);
         }
 
         return true;
@@ -109,7 +109,7 @@ public class State {
             editor.putString(Integer.toString(state_id), new_value);
             editor.commit();
         } catch (Exception e) {
-            Log.e(TAG, "Exception: writeStateString() " + e.toString(), e);
+            Log.e(TAG, "Exception: writeStateString() " + e, e);
         }
 
         return true;
@@ -130,7 +130,7 @@ public class State {
 
             editor.commit();
         } catch (Exception e) {
-            Log.e(TAG, "Exception: writeStateFlowControls() " + e.toString(), e);
+            Log.e(TAG, "Exception: writeStateFlowControls() " + e, e);
             return false;
         }
 
@@ -176,8 +176,7 @@ public class State {
      */
     public boolean readStateBool(int state_id) {
         int value = sharedPref.getInt(Integer.toString(state_id), 0);
-        if (value == 0) return false;
-        return true;
+        return value != 0;
     }
 
     /**
@@ -187,8 +186,6 @@ public class State {
         String value = sharedPref.getString(Integer.toString(state_id), "");
         if (value.isEmpty()) return null;
 
-        byte[] array = Log.hexToBytes(value);
-
-        return array;
+        return Log.hexToBytes(value);
     }
 }

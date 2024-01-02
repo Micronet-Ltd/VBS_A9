@@ -110,7 +110,7 @@ public class VehicleBusDiscovery {
         if (!busWrapper.start(BUS_NAME, busDiscoverReadyCallback, null)) {
             Log.e(TAG, "Error starting bus with bus wrapper.");
             return false;
-        };
+        }
 
         // and wait a certain amount of time on this socket before switching bitrates
         mainHandler.postDelayed(discoverBusTask, DISCOVER_BUS_WAIT_MS); // try again in five seconds
@@ -147,10 +147,7 @@ public class VehicleBusDiscovery {
     //  mark the current bus as discovered
     ///////////////////////////////////////////////////////////////
     public boolean isInDiscovery() {
-        if (discoveryStage != DISCOVERY_STAGE_OFF)
-            return true;
-        else
-            return false;
+        return discoveryStage != DISCOVERY_STAGE_OFF;
     }
 
 
@@ -259,7 +256,7 @@ public class VehicleBusDiscovery {
                 busWrapper.restart(null, null, null); // don't change any callbacks
 
             } catch(Exception e) {
-                Log.e(TAG + ".discoverBusTask", "Exception: " + e.toString(), e);
+                Log.e(TAG + ".discoverBusTask", "Exception: " + e, e);
             }
             if (discoveryStage != DISCOVERY_STAGE_OFF)
                 mainHandler.postDelayed(discoverBusTask, DISCOVER_BUS_WAIT_MS); // expire again in five seconds

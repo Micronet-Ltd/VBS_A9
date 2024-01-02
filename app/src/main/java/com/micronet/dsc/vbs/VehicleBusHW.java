@@ -5,7 +5,6 @@
 package com.micronet.dsc.vbs;
 
 import android.graphics.Color;
-import androidx.core.app.NotificationCompat;
 
 import com.micronet.canbus.CanbusException;
 import com.micronet.canbus.CanbusFilter;
@@ -70,14 +69,6 @@ class VehicleBusHW {
             return new CANFrame(mFrame.getId(), mFrame.getData(), CANFrameType.downcast(mFrame.getType()));
         }
 
-        public int getId() {
-            return super.getId();
-        }
-
-        public byte[] getData() {
-            return super.getData();
-        }
-
     }
 
     /**
@@ -96,13 +87,6 @@ class VehicleBusHW {
             return new CAN2Frame(mFrame.getId(), mFrame.getData(), CANFrameType.downcast(mFrame.getType()));
         }
 
-        public int getId() {
-            return super.getId();
-        }
-
-        public byte[] getData() {
-            return super.getData();
-        }
     }
 
     /**
@@ -227,7 +211,7 @@ class VehicleBusHW {
         try {
             canInterface = new CanbusInterface();
         } catch (Exception e) {
-            Log.e(TAG, "Unable to create new CanbusInterface() " + e.toString());
+            Log.e(TAG, "Unable to create new CanbusInterface() " + e);
             // TODO Need to handle this failure correctly.
             return null;
         }
@@ -244,24 +228,24 @@ class VehicleBusHW {
         try {
             canInterface.create(listen_only, bitrate,true, filterArray, canNumber, flowControlMessages);
         } catch (CanbusException e) {
-            Log.e(TAG, "Can" +(canNumber-1)+ ": Unable to call create(" + listen_only +") | CanNumber = (" +  canNumber+ ") for CanbusInterface()" + e.toString() + ". Num=" + e.getErrorCode());
+            Log.e(TAG, "Can" +(canNumber-1)+ ": Unable to call create(" + listen_only +") | CanNumber = (" +  canNumber+ ") for CanbusInterface()" + e + ". Num=" + e.getErrorCode());
 
             switch (e.getErrorCode()) {
                 case CanbusException.INVALID_PARAMETERS:
-                    service.updateForegroundNotification("Error creating Canbus Interface for CAN "+(canNumber-1)+". Invalid parameters.", Color.RED, NotificationCompat.PRIORITY_DEFAULT);
+                    service.updateForegroundNotification("Error creating Canbus Interface for CAN "+(canNumber-1)+". Invalid parameters.", Color.RED);
                     break;
                 case CanbusException.PORT_DOESNT_EXIST:
-                    service.updateForegroundNotification("Error creating Canbus Interface for CAN "+(canNumber-1)+". Port doesn't exist.", Color.RED, NotificationCompat.PRIORITY_DEFAULT);
+                    service.updateForegroundNotification("Error creating Canbus Interface for CAN "+(canNumber-1)+". Port doesn't exist.", Color.RED);
                     break;
                 default:
-                    service.updateForegroundNotification("Error creating Canbus Interface for CAN "+(canNumber-1)+".", Color.RED, NotificationCompat.PRIORITY_DEFAULT);
+                    service.updateForegroundNotification("Error creating Canbus Interface for CAN "+(canNumber-1)+".", Color.RED);
                     break;
             }
 
             return null;
         }
 
-        service.updateForegroundNotification("CAN " +(canNumber-1)+ ": Created Interface @" + (bitrate/1000) + "k " + (listen_only ? "in read only mode. Running.": "in normal mode. Running."), Color.GREEN, NotificationCompat.PRIORITY_DEFAULT);
+        service.updateForegroundNotification("CAN " +(canNumber-1)+ ": Created Interface @" + (bitrate/1000) + "k " + (listen_only ? "in read only mode. Running.": "in normal mode. Running."), Color.GREEN);
         Log.d(TAG, "Interface created @ " + bitrate + "kb " + (listen_only ? "READ-ONLY" : "READ-WRITE"));
         return new InterfaceWrapper(canInterface);
     } // createInterface()
@@ -275,14 +259,14 @@ class VehicleBusHW {
             try {
                 wrappedInterface.canbusInterface.removeCAN1();
             } catch (Exception e) {
-                Log.e(TAG, "Can1: Unable to remove CanbusInterface() " + e.toString());
+                Log.e(TAG, "Can1: Unable to remove CanbusInterface() " + e);
             }
         }else if (canNumber == CAN_PORT2){
 
             try {
                 wrappedInterface.canbusInterface.removeCAN2();
             } catch (Exception e) {
-                Log.e(TAG, "Can2: Unable to remove CanbusInterface() " + e.toString());
+                Log.e(TAG, "Can2: Unable to remove CanbusInterface() " + e);
             }
         }
     } // removeInterface()
@@ -302,7 +286,7 @@ class VehicleBusHW {
                 }
                 // set socket options here
             } catch (Exception e) {
-                Log.e(TAG, "Exception creating Socket: " + e.toString(), e);
+                Log.e(TAG, "Exception creating Socket: " + e, e);
                 return null;
             }
         }else if(canNumber == CAN_PORT2){ //create a new socket for Can2.
@@ -315,7 +299,7 @@ class VehicleBusHW {
                     Log.d(TAG, "Can2: Socket created: " + socket);
                 }
             }catch(Exception e){
-                Log.e(TAG, "Exception creating Socket: " + e.toString(), e);
+                Log.e(TAG, "Exception creating Socket: " + e, e);
             }
         }
 
@@ -329,7 +313,7 @@ class VehicleBusHW {
                 wrappedSocket.canbusSocket.openCan1();
                 Log.d(TAG, "Can1: Socket Opened");
             } catch (Exception e) {
-                Log.e(TAG, "Exception opening Socket: " + e.toString(), e);
+                Log.e(TAG, "Exception opening Socket: " + e, e);
                 return false;
             }
         }else if (canNumber == CAN_PORT2){// Opening socket for Can2
@@ -337,7 +321,7 @@ class VehicleBusHW {
                 wrappedSocket.canbusSocket.openCan2();
                 Log.d(TAG, "Can2: Socket Opened");
             }catch(Exception e){
-                Log.e(TAG, "Exception opening Socket: " + e.toString(), e);
+                Log.e(TAG, "Exception opening Socket: " + e, e);
                 return false;
             }
         }
@@ -348,7 +332,7 @@ class VehicleBusHW {
                 wrappedSocket.canbusSocket.discardInBuffer();
                 Log.d(TAG, "Socket discarded");
             } catch (Exception e) {
-                Log.e(TAG, "Exception discarding Socket buffer: " + e.toString(), e);
+                Log.e(TAG, "Exception discarding Socket buffer: " + e, e);
                 return false;
             }
         }
@@ -369,7 +353,7 @@ class VehicleBusHW {
                 wrappedSocket = null;
                 Log.d(TAG, "Can1: Socket Closed");
             } catch (Exception e) {
-                Log.e(TAG, "Exception closeSocket()" + e.toString(), e);
+                Log.e(TAG, "Exception closeSocket()" + e, e);
             }
         }else if(canNumber == CAN_PORT2){
             try {
@@ -380,7 +364,7 @@ class VehicleBusHW {
                 wrappedSocket = null;
                 Log.d(TAG, "Can2: Socket Closed");
             }catch(Exception e){
-                Log.e(TAG, "Exception closeSocket()" + e.toString(), e);
+                Log.e(TAG, "Exception closeSocket()" + e, e);
             }
         }
     } // closeSocket();
@@ -423,7 +407,7 @@ class VehicleBusHW {
             i++;
         }
 
-        Log.d(TAG, "Filters = {\n" + filter_str.toString() + "}");
+        Log.d(TAG, "Filters = {\n" + filter_str + "}");
     }
 
     /**
@@ -438,6 +422,6 @@ class VehicleBusHW {
                     i++, flowControl.getSearchId(), flowControl.getResponseId(), flowControl.getFlowMessageType(), flowControl.getFlowDataLength()));
         }
 
-        Log.d(TAG, "Flow Controls = {\n" + flowControlStr.toString() + "}");
+        Log.d(TAG, "Flow Controls = {\n" + flowControlStr + "}");
     }
 } // VehicleBusHW

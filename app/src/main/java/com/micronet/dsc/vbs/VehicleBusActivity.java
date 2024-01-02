@@ -48,13 +48,4 @@ public class VehicleBusActivity extends Activity {
         finish();
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-    }
 }

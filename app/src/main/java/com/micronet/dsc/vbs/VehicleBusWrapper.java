@@ -54,11 +54,11 @@ public class VehicleBusWrapper extends VehicleBusHW {
     // We need a list of which bus types are currently actively used.
     //  We'll shut down the socket when nobody needs it.
 
-    ArrayList<String> instanceNames = new ArrayList<String>();
+    ArrayList<String> instanceNames = new ArrayList<>();
 
 
     // A class to hold callbacks so we can let others know when their requested socket is ready or when it has gone away
-    private class callbackStruct {
+    private static class callbackStruct {
         String busName;
         Runnable callback;
 
@@ -68,8 +68,8 @@ public class VehicleBusWrapper extends VehicleBusHW {
         }
     }
 
-    ArrayList<callbackStruct> callbackArrayReady = new ArrayList<callbackStruct>();
-    ArrayList<callbackStruct> callbackArrayTerminated = new ArrayList<callbackStruct>();
+    ArrayList<callbackStruct> callbackArrayReady = new ArrayList<>();
+    ArrayList<callbackStruct> callbackArrayTerminated = new ArrayList<>();
 
 
     // Create a new class for thread where startup/shutdown work will be performed
@@ -477,7 +477,6 @@ public class VehicleBusWrapper extends VehicleBusHW {
 
         // setup() : External call to setup the bus
         public boolean setup() {
-            boolean result = doInternalSetup();
 
 
             /*
@@ -485,7 +484,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
             Thread setupThread = new Thread(busSetupRunnable);
             setupThread.start();
             */
-            return result;
+            return doInternalSetup();
         }
 
         // teardown () : External call to teardown the bus
@@ -504,14 +503,14 @@ public class VehicleBusWrapper extends VehicleBusHW {
         //  returns true if setup was successful, otherwise false
         ///////////////////////////////////////////
         boolean doInternalSetup() { // Todo: deleted parameter-canNumber. This method should be getting it from the global.
-            setupInterface = createInterface(canNumber, listen_only, bitrate, hardwareFilters, flowControls); /**Stage 1: Create interface**/
+            setupInterface = createInterface(canNumber, listen_only, bitrate, hardwareFilters, flowControls); //Stage 1: Create interface
             if (setupInterface == null) {
                 service.forceStopCAN();
                 return false;
             }
 
             Log.v(TAG, "creating socket");
-            setupSocket = createSocket(canNumber, setupInterface); /**Stage 2: Create Socket**/
+            setupSocket = createSocket(canNumber, setupInterface); //Stage 2: Create Socket
             if (setupSocket == null) {
                 removeInterface(canNumber, setupInterface);
                 isClosed = true;

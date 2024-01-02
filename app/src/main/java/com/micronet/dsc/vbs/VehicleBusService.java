@@ -263,7 +263,7 @@ public class VehicleBusService extends Service {
     // saveCAN()
     // save CAN information to file so we can load it up on restart.
     ////////////////////////////////////////////////////////////////
-    void saveCAN(boolean enabled, int bitrate, boolean auto_detect, int[] ids, int masks[], int canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
+    void saveCAN(boolean enabled, int bitrate, boolean auto_detect, int[] ids, int[] masks, int canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
         Context context = getApplicationContext();
         State state = new State(context);
 
@@ -308,7 +308,7 @@ public class VehicleBusService extends Service {
     //  load_last_confirmed: whether or not we should load the last confirmed bitrate from file
     //      when service receives the "restart" action, then we will load this from file, otherwise we only use what is in memory
     ////////////////////////////////////////////////////////////////
-    void startCAN(int bitrate, boolean skip_verify, boolean auto_detect, int[] ids, int masks[], int canNumber, boolean load_last_confirmed, ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
+    void startCAN(int bitrate, boolean skip_verify, boolean auto_detect, int[] ids, int[] masks, int canNumber, boolean load_last_confirmed, ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
         Log.d(TAG, "+startCAN():");
 
         if (hasStartedCAN) {
@@ -444,10 +444,10 @@ public class VehicleBusService extends Service {
     /**
      * Update notification description.
      */
-    void updateForegroundNotification(String description, int color, int priority) {
+    void updateForegroundNotification(String description, int color) {
         builder.setContentText(description);
         builder.setColor(color);
-        builder.setPriority(priority);
+        builder.setPriority(NotificationCompat.PRIORITY_DEFAULT);
         notificationManager.notify(NOTFICATION_ID, builder.build());
     }
 
@@ -494,9 +494,8 @@ public class VehicleBusService extends Service {
     // statusTask()
     //  Timer to broadcast that we are still alive
     ///////////////////////////// //////////////////////////////////
-    private Runnable statusTask = new Runnable() {
+    private final Runnable statusTask = new Runnable() {
 
-        int count = 0;
         @Override
         public void run() {
             try {
@@ -512,7 +511,7 @@ public class VehicleBusService extends Service {
                 if (mainHandler != null)
                     mainHandler.postDelayed(statusTask, BROADCAST_STATUS_DELAY_MS); // broadcast a status every 1s
             } catch (Exception e) {
-                Log.e(TAG + ".statusTask", "Exception: " + e.toString(), e);
+                Log.e(TAG + ".statusTask", "Exception: " + e, e);
             }
         }
     }; // statusTask()

@@ -22,12 +22,9 @@ import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.SystemClock;
 
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import static com.micronet.dsc.vbs.VehicleBusService.service;
 
 
 public class VehicleBusCAN {
@@ -53,8 +50,8 @@ public class VehicleBusCAN {
     Runnable readyTxRunnable = null; // runnable to be posted to handler when the bus is ready for transmit/receive
 
 
-    List<VehicleBusWrapper.CANFrame> incomingList = Collections.synchronizedList(new ArrayList<VehicleBusWrapper.CANFrame>());
-    List<VehicleBusWrapper.CANFrame> outgoingList = Collections.synchronizedList(new ArrayList<VehicleBusWrapper.CANFrame>());
+    final List<VehicleBusWrapper.CANFrame> incomingList = Collections.synchronizedList(new ArrayList<>());
+    final List<VehicleBusWrapper.CANFrame> outgoingList = Collections.synchronizedList(new ArrayList<>());
 
 
     VehicleBusWrapper busWrapper;
@@ -69,8 +66,8 @@ public class VehicleBusCAN {
 
     public VehicleBusCAN(Context context) {
         busWrapper = VehicleBusWrapper.getInstance();
-        busWrapper.isUnitTesting = false;
-        busWrapper.canNumber = DEFAULT_CAN_NUMBER;
+        VehicleBusWrapper.isUnitTesting = false;
+        VehicleBusWrapper.canNumber = DEFAULT_CAN_NUMBER;
         this.context = context;
 
         busDiscoverer = new VehicleBusDiscovery(context, busWrapper, BUS_NAME);
@@ -78,8 +75,8 @@ public class VehicleBusCAN {
 
     public VehicleBusCAN(Context context, boolean isUnitTesting) {
         busWrapper = VehicleBusWrapper.getInstance();
-        busWrapper.isUnitTesting = isUnitTesting;
-        busWrapper.canNumber = DEFAULT_CAN_NUMBER;
+        VehicleBusWrapper.isUnitTesting = isUnitTesting;
+        VehicleBusWrapper.canNumber = DEFAULT_CAN_NUMBER;
         this.context = context;
 
         busDiscoverer = new VehicleBusDiscovery(context, busWrapper, BUS_NAME);
@@ -110,7 +107,7 @@ public class VehicleBusCAN {
             e.printStackTrace();
         }
 
-        if (busWrapper.isUnitTesting) {
+        if (VehicleBusWrapper.isUnitTesting) {
             // since we are unit testing and not on realy device, even creating the CanbusInterface will fail fatally,
             //  so we need to skip this in testing
             Log.e(TAG, "UnitTesting is on. Will not create CAN Interface");
@@ -214,39 +211,35 @@ public class VehicleBusCAN {
     }
 
 
+    // run()
     ///////////////////////////////////////////////////////////
     // busReadyReadWriteCallback()
     //  This is called when a normal socket is ready
     ///////////////////////////////////////////////////////////
-    private Runnable busReadyReadWriteCallback = new Runnable() {
-        @Override
-        public void run() {
-            try {
+    private final Runnable busReadyReadWriteCallback = () -> {
+        try {
 //                Log.v(TAG, "busReadyReadWriteCallback()");
-                startReading();
-                startWriting();
+            startReading();
+            startWriting();
 //                Log.v(TAG, "busReadyReadWriteCallback() END");
-            } catch (Exception e) {
-                Log.e(TAG + ".busReadyReadWriteCallback", "Exception: " + e.toString(), e);
-            }
-        } // run()
+        } catch (Exception e) {
+            Log.e(TAG + ".busReadyReadWriteCallback", "Exception: " + e, e);
+        }
     }; // busReadyReadWriteCallback()
 
 
+    // run()
     ///////////////////////////////////////////////////////////
     // busReadyReadOnlyCallback()
     //  This is called when a listen-only socket is ready
     ///////////////////////////////////////////////////////////
-    private Runnable busReadyReadOnlyCallback = new Runnable() {
-        @Override
-        public void run() {
-            try {
+    private final Runnable busReadyReadOnlyCallback = () -> {
+        try {
 //                Log.v(TAG, "busReadyReadOnlyCallback ()");
-                startReading();
-            } catch (Exception e) {
-                Log.e(TAG + ".busReadyReadOnlyCallback ", "Exception: " + e.toString(), e);
-            }
-        } // run()
+            startReading();
+        } catch (Exception e) {
+            Log.e(TAG + ".busReadyReadOnlyCallback ", "Exception: " + e, e);
+        }
     }; // busReadyReadOnlyCallback ()
 
 
@@ -272,7 +265,7 @@ public class VehicleBusCAN {
         canReadRunnable = new CANReadRunnable(canSocket);
 
         // If we aren't unit testing, then start the thread
-        if (!busWrapper.isUnitTesting) {
+        if (!VehicleBusWrapper.isUnitTesting) {
             Thread clientThread = new Thread(canReadRunnable);
             clientThread.start();
         }
@@ -300,7 +293,7 @@ public class VehicleBusCAN {
         canWriteRunnable = new CANWriteRunnable(canSocket);
 
         // If we aren't unit testing, then start the thread
-        if (!busWrapper.isUnitTesting) {
+        if (!VehicleBusWrapper.isUnitTesting) {
             Thread clientThread = new Thread(canWriteRunnable);
             clientThread.start();
         }
@@ -769,7 +762,7 @@ public class VehicleBusCAN {
                     sendFrame(frame);
                 }
             } catch (Exception e) {
-                Log.e(TAG, ".txReceiver Exception : " + e.toString(), e);
+                Log.e(TAG, ".txReceiver Exception : " + e, e);
             }
 
         }
