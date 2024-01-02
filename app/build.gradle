@@ -12,7 +12,6 @@ android {
         tab8keys
         obc5keys
     }
-    compileSdkVersion 34
 
     defaultConfig {
         applicationId "com.micronet.dsc.vbs"
@@ -20,6 +19,7 @@ android {
         versionName "4.0.2"
 	    setProperty("archivesBaseName", "MicronetVBS-v" + versionName )
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        minSdk 28
     }
     buildTypes {
         release {
@@ -32,43 +32,16 @@ android {
         }
     }
 
-    flavorDimensions "device"
-    productFlavors {
-        tab8 {
-            dimension "device"
-            applicationIdSuffix ""
-            versionNameSuffix "-tab8"
-            buildConfigField "String", "BUILD_DEVICE", '"tab8"'
-            buildConfigField "String", "ATS_ID_SUFFIX", '".tab8"'  // for talking to ATS
-            minSdkVersion 28
-            targetSdkVersion 28
-//            signingConfig signingConfigs.tab8keys
-        }
-        obc5 {
-            dimension "device"
-            //applicationIdSuffix ".obc5"
-            applicationIdSuffix "" // leave this blank because ATS uses the application name to start VBS
-            versionNameSuffix "-obc5"
-            buildConfigField "String", "BUILD_DEVICE", '"obc5"'
-            buildConfigField "String", "ATS_ID_SUFFIX", '".obc5"' // for talking to ATS
-            minSdkVersion 28
-            targetSdkVersion 28
-//            signingConfig signingConfigs.obc5keys
-            dependencies {
-                implementation fileTree(dir: 'obc5/jniLibs', include: ['.so'])
-            }
-        }
-    }
     compileOptions {
         sourceCompatibility = 1.8
         targetCompatibility = 1.8
     }
+    compileSdk 34
 }
 
 dependencies {
     implementation 'androidx.legacy:legacy-support-core-utils:1.0.0'
-    tab8Implementation files('libs/vehiclebus_api.jar')
-    obc5Implementation files('libs/obc5_vehiclebus_api.jar')
+    implementation files('libs/vehiclebus_api.jar')
 
     implementation 'com.google.code.gson:gson:2.10.1'
 
@@ -82,17 +55,3 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     implementation 'androidx.appcompat:appcompat:1.6.1'
 }
-
-//def tab8_props = new Properties()
-//tab8_props.load(new FileInputStream(rootProject.file("tab8keys.properties")))
-//android.signingConfigs.tab8keys.storeFile rootProject.file(tab8_props.keyStore)
-//android.signingConfigs.tab8keys.storePassword tab8_props.keyStorePassword
-//android.signingConfigs.tab8keys.keyAlias tab8_props.keyAlias
-//android.signingConfigs.tab8keys.keyPassword tab8_props.keyAliasPassword
-//
-//def obc5_props = new Properties()
-//obc5_props.load(new FileInputStream(rootProject.file("obc5keys.properties")))
-//android.signingConfigs.obc5keys.storeFile rootProject.file(obc5_props.keyStore)
-//android.signingConfigs.obc5keys.storePassword obc5_props.keyStorePassword
-//android.signingConfigs.obc5keys.keyAlias obc5_props.keyAlias
-//android.signingConfigs.obc5keys.keyPassword obc5_props.keyAliasPassword

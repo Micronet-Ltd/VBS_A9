@@ -15,7 +15,7 @@ public final class VehicleBusConstants {
     //////////////////////////////////////
 
     public static final String PACKAGE_NAME_VBS = "com.micronet.dsc.vbs";
-    public static final String PACKAGE_NAME_ATS = "com.micronet.dsc.ats" + BuildConfig.ATS_ID_SUFFIX;
+    public static final String PACKAGE_NAME_ATS = "com.micronet.dsc.ats";
 
     public static final String PERMISSION_VBS_TXRX = "com.micronet.dsc.vbs.TXRX";
 

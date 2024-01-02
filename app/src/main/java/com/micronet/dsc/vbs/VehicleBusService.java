@@ -77,7 +77,7 @@ public class VehicleBusService extends Service {
 
     @Override
     public void onCreate() {
-        Log.i(TAG, "Service Created: VBS device=" + BuildConfig.BUILD_DEVICE + " version=" + BuildConfig.VERSION_NAME);
+        Log.i(TAG, "Service Created: VBS device=SC600" + " version=" + BuildConfig.VERSION_NAME);
         processId = android.os.Process.myPid();
         mainHandler  = new Handler();
         service = this;
