@@ -144,29 +144,19 @@ public class VehicleBusService extends Service {
                 CAN_NUMBER = canNumber; // Setting the CAN_NUMBER to match the canNumber, this is used for other classes
                 Log.d(TAG, "CAN_NUMBER = " + CAN_NUMBER);
 
-                ArrayList<VehicleBusHW.CANFlowControl> flowControls = null;
-                if (flowControl) {
-                    flowControls = Config.getFlowControls(canNumber);
-                    if (flowControls != null) {
-                        Log.d(TAG, "Using flow controls from configuration.xml.");
-                    } else {
-                        Log.d(TAG, "Flow controls are null.");
-                    }
-                }
-
                 // Remember Canbus settings.
-                saveCAN(true, bitrate, auto_detect, ids, masks, canNumber, flowControls);
+                saveCAN(true, bitrate, auto_detect, ids, masks);
 
                 // Start Canbus.
                 stopCAN(false);
-                startCAN(bitrate, skip_verify, auto_detect, ids, masks, canNumber,false, flowControls);
+                startCAN(bitrate, skip_verify, auto_detect, ids, masks,false);
             }
         } else if (action.equals(VehicleBusConstants.SERVICE_ACTION_STOP)) {
             Log.i(TAG, "Vehicle Bus Service Stopped: " + bus);
 
             if (bus.equals(CAN_LABEL)) {
 
-                saveCAN(false, 0, false, null, null, 0, null); // Todo: addCanBus. Ask about this, do I need anything else to tell the service to close canPort?
+                saveCAN(false, 0, false, null, null); // Todo: addCanBus. Ask about this, do I need anything else to tell the service to close canPort?
                 setBackground();
                 stopSelf(); // nothing on, stop everything and exit
             }
@@ -232,10 +222,7 @@ public class VehicleBusService extends Service {
                     return false; // we can't start, not sure what to do, we don't want to start without any filters
                 }
             }
-
-            ArrayList<VehicleBusHW.CANFlowControl> flowControls = state.readStateFlowControls();
-
-            startCAN(bitrate, false, auto_detect, ids, masks, canNumber,true, flowControls);
+            startCAN(bitrate, false, auto_detect, ids, masks, true);
         }
 
         return true;
@@ -263,7 +250,7 @@ public class VehicleBusService extends Service {
     // saveCAN()
     // save CAN information to file so we can load it up on restart.
     ////////////////////////////////////////////////////////////////
-    void saveCAN(boolean enabled, int bitrate, boolean auto_detect, int[] ids, int[] masks, int canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
+    void saveCAN(boolean enabled, int bitrate, boolean auto_detect, int[] ids, int[] masks) {
         Context context = getApplicationContext();
         State state = new State(context);
 
@@ -272,7 +259,6 @@ public class VehicleBusService extends Service {
             // Save more info about the CAN.
             state.writeState(State.CAN_BITRATE, bitrate);
             state.writeState(State.FLAG_CAN_AUTODETECT, (auto_detect ? 1 : 0));
-            state.writeState(State.CAN_NUMBER, canNumber);
 
             String idstring = "";
             String maskstring = "";
@@ -293,7 +279,6 @@ public class VehicleBusService extends Service {
             }
             state.writeStateString(State.CAN_FILTER_IDS, idstring);
             state.writeStateString(State.CAN_FILTER_MASKS, maskstring);
-            state.writeStateFlowControls(flowControls);
         }
     }
 
@@ -308,7 +293,7 @@ public class VehicleBusService extends Service {
     //  load_last_confirmed: whether or not we should load the last confirmed bitrate from file
     //      when service receives the "restart" action, then we will load this from file, otherwise we only use what is in memory
     ////////////////////////////////////////////////////////////////
-    void startCAN(int bitrate, boolean skip_verify, boolean auto_detect, int[] ids, int[] masks, int canNumber, boolean load_last_confirmed, ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
+    void startCAN(int bitrate, boolean skip_verify, boolean auto_detect, int[] ids, int[] masks, boolean load_last_confirmed) {
         Log.d(TAG, "+startCAN():");
 
         if (hasStartedCAN) {
@@ -317,10 +302,6 @@ public class VehicleBusService extends Service {
 
         hasStartedCAN = true; // don't start again
         Context context = getApplicationContext();
-
-        // create the combined filters
-        VehicleBusWrapper.CANHardwareFilter[] canHardwareFilters = createCombinedFilters(ids, masks);
-
 
         my_can = new VehicleBusCAN(context, isUnitTesting);
 
@@ -332,10 +313,9 @@ public class VehicleBusService extends Service {
         if (skip_verify) {
             // we've requested to treat this bitrate as confirmed
             my_can.setConfirmedBitRate(bitrate);
-            my_can.setConfirmedCanNumber(canNumber);
         }
 
-        if (!my_can.start(bitrate, auto_detect, canHardwareFilters, canNumber, flowControls)) {
+        if (!my_can.start(bitrate, auto_detect, ids, masks)) {
             Log.e(TAG, "Error starting bus with bus wrapper.");
             return;
         }
@@ -388,32 +368,6 @@ public class VehicleBusService extends Service {
         hasStartedCAN = false;
 
     } // forceStopCAN()
-
-    ///////////////////////////////////////////////////////////////
-    // createCombinedFilters()
-    //  take the ids and masks passed to this and combine into CanBusHardwareFilter
-    ///////////////////////////////////////////////////////////////
-    VehicleBusWrapper.CANHardwareFilter[] createCombinedFilters(int[] ids, int[] masks) {
-
-
-        if ((ids == null) || (masks == null) ||
-                (ids.length == 0) || (masks.length == 0)) {
-            Log.e(TAG, "Error -- no can filters specified");
-            return null;
-        }
-
-        int count = ids.length;
-        VehicleBusWrapper.CANHardwareFilter[] canHardwareFilters = new VehicleBusWrapper.CANHardwareFilter[count];
-
-        for (int i = 0; i < masks.length && i < ids.length; i++) {
-            canHardwareFilters[i] =
-                    new VehicleBusWrapper.CANHardwareFilter(ids[i], masks[i], VehicleBusWrapper.CANFrameType.EXTENDED);
-        }
-
-        return canHardwareFilters;
-
-
-    } // createCombinedFilters()
 
     ////////////////////////////////////////////
     ////////////////////////////////////////////
@@ -483,7 +437,7 @@ public class VehicleBusService extends Service {
             ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANRX, my_can.isReadReady());
             ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANTX, my_can.isWriteReady());
             ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANBITRATE, my_can.getBitrate());
-            ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANNUMBER, my_can.getCanNumber());
+//            ibroadcast.putExtra(VehicleBusConstants.BROADCAST_EXTRA_STATUS_CANNUMBER, my_can.getCanNumber());
         }
 
         context.sendBroadcast(ibroadcast);

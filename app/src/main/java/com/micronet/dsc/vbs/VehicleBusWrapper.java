@@ -12,10 +12,20 @@
 
 package com.micronet.dsc.vbs;
 
+import android.annotation.SuppressLint;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
+import java.nio.LongBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 
 import static com.micronet.dsc.vbs.VehicleBusService.service;
@@ -24,7 +34,7 @@ import static com.micronet.dsc.vbs.VehicleBusService.service;
 /**
  * Created by dschmidt on 2/18/16.
  */
-public class VehicleBusWrapper extends VehicleBusHW {
+public class VehicleBusWrapper{
     public static final String TAG = "ATS-VBS-Wrap";
 
     static int canNumber;
@@ -33,6 +43,8 @@ public class VehicleBusWrapper extends VehicleBusHW {
 
     // Singleton methods: makes this class a singleton
     private static VehicleBusWrapper instance = null;
+    private CanSocket mSocket;
+
     private VehicleBusWrapper() {}
     public static VehicleBusWrapper getInstance() {
         if(instance == null) {
@@ -91,10 +103,10 @@ public class VehicleBusWrapper extends VehicleBusHW {
     // setCharacteristics()
     //  set details for the CAN, call this before starting a CAN bus
     //////////////////////////////////////////////////
-    public boolean setCharacteristics(boolean listen_only, int bitrate, CANHardwareFilter[] hwFilters, int canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControls) { // Todo: Should I include canNumber in here? since I
+    public boolean setCharacteristics(boolean listen_only, int bitrate, int[] ids, int[] masks) { // Todo: Should I include canNumber in here? since I
 
         // will take effect on the next bus stop/start cycle
-        busSetupRunnable.setCharacteristics(listen_only, bitrate, hwFilters, canNumber, flowControls);
+        busSetupRunnable.setCharacteristics(listen_only, bitrate, ids, masks);
         return true;
     } // setCharacteristics()
 
@@ -291,10 +303,8 @@ public class VehicleBusWrapper extends VehicleBusHW {
     // getCANSocket()
     //  return the socket that this wrapper created
     ///////////////////////////////////////////////////
-    public CANSocket getCANSocket() {
-        if (busSetupRunnable == null) return null; // never even created
-        if (!busSetupRunnable.isSetup()) return null; // no valid socket
-        return new CANSocket(busSetupRunnable.setupSocket, busSetupRunnable.canNumber);
+    public CanSocket getCANSocket() {
+        return mSocket;
     } // getCANSocket()
 
 
@@ -415,26 +425,54 @@ public class VehicleBusWrapper extends VehicleBusHW {
     // this sets up or tears down the socket + interface
     //  It is separated into own class so it can be run on its own thread for testing.
     ////////////////////////////////////////////////////////
-    class BusSetupRunnable { // implements Runnable {
-
-
-        volatile boolean cancelThread = false;
+    class BusSetupRunnable {
         volatile boolean isClosed = false;
-
         volatile boolean isSocketReady = false;
-
-        InterfaceWrapper setupInterface;
-        SocketWrapper setupSocket;
-
         boolean listen_only = true; // default listen_only
         int bitrate = 250000; // default bit rate
-        int canNumber = 2;
-        CANHardwareFilter[] hardwareFilters = null;
-        ArrayList<VehicleBusHW.CANFlowControl> flowControls;
+        int[] ids = null;
+        int[] masks = null;
+
+        int socketNum, idxNum;
+        Class<?> canServiceClass;
+        Method bitrateMethod;
+        Method mode;
+        Method link;
+        Method open;
+        Method bind;
+        Method close;
+        Method config;
+        Method send;
+        Method receiveMsg;
+        Method mask;
+        Object canService;
 
 
         BusSetupRunnable() {
             setDefaultCharacteristics();
+            setReflection();
+
+        }
+        @SuppressLint("PrivateApi")
+        private void setReflection(){
+            try {
+                canServiceClass = Class.forName("com.android.server.net.CanbusService");
+                bitrateMethod = canServiceClass.getDeclaredMethod("bitrate", int.class);
+                mode = canServiceClass.getDeclaredMethod("mode", String.class);
+                link = canServiceClass.getDeclaredMethod("link", String.class);
+                open = canServiceClass.getDeclaredMethod("open", String.class);
+                bind = canServiceClass.getDeclaredMethod("bind", String.class, int.class);
+                close = canServiceClass.getDeclaredMethod("close", int.class);
+                config = canServiceClass.getDeclaredMethod("config", String.class, IntBuffer.class, IntBuffer.class, int.class, int.class, int.class, int.class, int.class);
+                send = canServiceClass.getDeclaredMethod("send", int.class,int.class,int.class,byte[].class);
+                receiveMsg =canServiceClass.getDeclaredMethod("recvmsg", int.class, int.class, IntBuffer.class,
+                        IntBuffer.class, LongBuffer.class, IntBuffer.class, ByteBuffer.class);
+                mask=canServiceClass.getDeclaredMethod("mask",IntBuffer.class,IntBuffer.class);
+                canService =canServiceClass.getConstructor().newInstance();
+            } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException |
+                     InvocationTargetException | java.lang.InstantiationException e) {
+                e.printStackTrace();
+            }
         }
 
 
@@ -444,21 +482,22 @@ public class VehicleBusWrapper extends VehicleBusHW {
 
 
 
-        public void setCharacteristics(boolean new_listen_only, int new_bitrate, CANHardwareFilter[] new_hardwareFilters, int new_canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControlsArr) {
+        public void setCharacteristics(boolean new_listen_only, int new_bitrate, int[] ids, int[] masks) {
             // these take effect at next Setup()
             listen_only = new_listen_only;
             bitrate = new_bitrate;
-            hardwareFilters = new_hardwareFilters;
-            canNumber = new_canNumber;
-            flowControls = flowControlsArr;
+            this.ids=ids;
+            this.masks=masks;
         }
 
 
         void setDefaultFilters() {
             // create default filters to block all CAN packets that arent all 0s
-            hardwareFilters = new CANHardwareFilter[2];
-            hardwareFilters[0] = new CANHardwareFilter(0, 0x3FFFFFF, CANFrameType.EXTENDED);
-            hardwareFilters[1] = new CANHardwareFilter(0, 0x7FF, CANFrameType.STANDARD);
+            ids=new int[2];
+            masks=new int[2];
+            ids[0]=0x80000000;
+            masks[0]=0x3FFFFFF;
+            masks[1]=0x7FF;
         }
 
 
@@ -497,45 +536,50 @@ public class VehicleBusWrapper extends VehicleBusHW {
         }
 
 
+        /** @noinspection DataFlowIssue*/
         ///////////////////////////////////////////
         // doInternalSetup()
         //  does all setup steps
         //  returns true if setup was successful, otherwise false
         ///////////////////////////////////////////
-        boolean doInternalSetup() { // Todo: deleted parameter-canNumber. This method should be getting it from the global.
-            setupInterface = createInterface(canNumber, listen_only, bitrate, hardwareFilters, flowControls); //Stage 1: Create interface
-            if (setupInterface == null) {
-                service.forceStopCAN();
+        boolean doInternalSetup() {
+            try {
+                IntBuffer hwFilter= ByteBuffer.allocateDirect(24).order(ByteOrder.nativeOrder()).asIntBuffer();
+                IntBuffer hwMask =ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder()).asIntBuffer();
+                IntBuffer swIds = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder()).asIntBuffer();
+                IntBuffer swFilter = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder()).asIntBuffer();
+
+                hwFilter.put(0).put(0).put(0).put(0).put(0).put(0);
+                hwFilter.rewind();
+                hwMask.put(0).put(0);
+                hwMask.rewind();
+
+
+                link.invoke(canService, "down");
+                SystemClock.sleep(200);
+
+                bitrateMethod.invoke(canService, bitrate);
+                SystemClock.sleep(200);
+
+                mode.invoke(canService, listen_only ? "listen-only" : "normal");
+                SystemClock.sleep(200);
+
+                android.util.Log.e("MASK", String.valueOf(mask.invoke(canService, hwMask, hwFilter)));
+                SystemClock.sleep(200);
+
+
+                link.invoke(canService, "up");
+                SystemClock.sleep(200);
+
+                socketNum = (int) open.invoke(canService, "can0");
+                idxNum = (int) bind.invoke(canService, "can0", socketNum);
+                config.invoke(canService, "can0", swIds, swFilter, 0, 0, socketNum, 0, 0);
+                mSocket = new CanSocket(socketNum,idxNum,canService,send,receiveMsg);
+                return true;
+            } catch (Exception e){
+                e.printStackTrace();
                 return false;
             }
-
-            Log.v(TAG, "creating socket");
-            setupSocket = createSocket(canNumber, setupInterface); //Stage 2: Create Socket
-            if (setupSocket == null) {
-                removeInterface(canNumber, setupInterface);
-                isClosed = true;
-                return false;
-            }
-
-            Log.v(TAG, "opening socket");
-
-            // we want to discard buffer when opening listen-only sockets because this means we
-            //      may be switching bit-rates.
-
-            if (!openSocket(canNumber, setupSocket, listen_only)) {
-                removeInterface(canNumber, setupInterface);
-                isClosed = true;
-                return false;
-            }
-
-            isSocketReady = true;
-
-            // Notify the main thread that our socket is ready
-            callbackNowReady();
-
-
-
-            return true;
         } // doInternalSetup()
 
         /////////////////////////////////////////////
@@ -543,59 +587,18 @@ public class VehicleBusWrapper extends VehicleBusHW {
         //  does all teardown steps
         /////////////////////////////////////////////
         void doInternalTeardown(int canNumber) {
-
-
-
-            if (setupSocket != null)
-                closeSocket(canNumber, setupSocket);
-
-            setupSocket = null;
-
-            if (setupInterface != null)
-                removeInterface(canNumber, setupInterface);
-
-            setupInterface = null;
+            try {
+                close.invoke(canService, socketNum);
+                link.invoke(canService, "down");
+            } catch (Exception e){
+                e.printStackTrace();
+            }
+            mSocket=null;
 
             isSocketReady = false;
-
             // Notify the main threads that our socket is terminated
             callbackNowTerminated();
-
         } // doInternalTeardown()
-
-
-
-        //////////////////////////////////////////////////////
-        // run()
-        //      in case we want setup to occur on separate thread, we can run this
-        //////////////////////////////////////////////////////
-        public void run() {
-
-            Log.v(TAG, "Setup thread starting");
-
-
-            isClosed = false;
-            cancelThread = false;
-
-
-            // open the socket
-            if (!doInternalSetup()) return;
-
-            Log.v(TAG, "Setup thread ready");
-
-            while (!cancelThread) {
-                android.os.SystemClock.sleep(5); // we can wait 5 ms until we want to cancel this
-            }
-
-            Log.v(TAG, "Setup thread terminating");
-
-            doInternalTeardown(canNumber);
-
-            Log.v(TAG, "Setup thread terminated");
-            isClosed = true;
-
-
-        } // run
     } // BusSetupRunnable
 
 } // VehicleBusCommWrapper

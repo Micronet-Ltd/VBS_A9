@@ -37,7 +37,7 @@ android {
 
 dependencies {
     implementation 'androidx.legacy:legacy-support-core-utils:1.0.0'
-    implementation files('libs/vehiclebus_api.jar')
+//    implementation files('libs/vehiclebus_api.jar')
 
     implementation 'com.google.code.gson:gson:2.10.1'
 

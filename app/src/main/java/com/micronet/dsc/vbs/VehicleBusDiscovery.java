@@ -47,9 +47,9 @@ public class VehicleBusDiscovery {
 
     /// Things set by the calling class
     int initial_bitrate = VehicleBusCAN.DEFAULT_BITRATE;
-    VehicleBusWrapper.CANHardwareFilter[] hardwareFilters; // this must be set to something, otherwise no packets will be received and thus bus not discovered
+    int[] ids; // this must be set to something, otherwise no packets will be received and thus bus not discovered
+    int[] masks;
     String BUS_NAME; // the name of the bus we are discovering on, passed to the wrapper
-    ArrayList<VehicleBusHW.CANFlowControl> flowControls;
 
 
     //callbacks that are passed to the wrapper
@@ -83,10 +83,10 @@ public class VehicleBusDiscovery {
     //      call this before starting discovery
     //  hwFilters : determines what qualifies as a successful discovery .. this must be set to something
     ////////////////////////////////////////////////////////
-    public void setCharacteristics(int initial_bitrate, VehicleBusWrapper.CANHardwareFilter[] hwFilters, ArrayList<VehicleBusHW.CANFlowControl> flowControlsArr) {
+    public void setCharacteristics(int initial_bitrate, int[] ids, int[] masks) {
         this.initial_bitrate = initial_bitrate;
-        this.hardwareFilters = hwFilters;
-        this.flowControls = flowControlsArr;
+        this.ids=ids;
+        this.masks=masks;
     }
 
 
@@ -213,7 +213,7 @@ public class VehicleBusDiscovery {
 
 
         // restart on new bit rate, keep with discovery callbacks
-        busWrapper.setCharacteristics(true, new_bitrate, hardwareFilters, canNumber, flowControls);
+        busWrapper.setCharacteristics(true, new_bitrate, ids,masks);
     }
 
 

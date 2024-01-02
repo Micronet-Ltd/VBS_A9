@@ -22,6 +22,7 @@ import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.SystemClock;
 
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -50,8 +51,8 @@ public class VehicleBusCAN {
     Runnable readyTxRunnable = null; // runnable to be posted to handler when the bus is ready for transmit/receive
 
 
-    final List<VehicleBusWrapper.CANFrame> incomingList = Collections.synchronizedList(new ArrayList<>());
-    final List<VehicleBusWrapper.CANFrame> outgoingList = Collections.synchronizedList(new ArrayList<>());
+    final List<CanFrame> incomingList = Collections.synchronizedList(new ArrayList<>());
+    final List<CanFrame> outgoingList = Collections.synchronizedList(new ArrayList<>());
 
 
     VehicleBusWrapper busWrapper;
@@ -91,7 +92,7 @@ public class VehicleBusCAN {
     //      2) Confirmed (if we previously received frames at this bitrate and haven't switched bitrates or restarted app since)
     //      3) Unconfirmed (all others .. this will start up in listen mode until a frame is received)
     ///////////////////////////////////////////////////////
-    public boolean start(int initial_bitrate, boolean auto_detect, VehicleBusWrapper.CANHardwareFilter[] hardwareFilters, int canNumber, ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
+    public boolean start(int initial_bitrate, boolean auto_detect, int[] ids, int[] masks) {
 
 
         Log.v(TAG, "start() @ " + initial_bitrate + "kb " +
@@ -125,14 +126,14 @@ public class VehicleBusCAN {
             // Auto-detect mode
             clearConfirmedBitRate(); // erase any prior confirmations of bitrate
             clearConfirmedCanNumber(); // Todo: monitor this, seems like it should be here, just not so sure..
-            busDiscoverer.setCharacteristics(initial_bitrate, hardwareFilters, flowControls);
+            busDiscoverer.setCharacteristics(initial_bitrate, ids,masks);
             busDiscoverer.startDiscovery(busReadyReadOnlyCallback);
         } else if (confirmedBusBitrate == initial_bitrate) {
             // Confirmed mode
 
             // we know that this bitrate works since we've already used this bitrate
             // put our sockets into read & write mode
-            busWrapper.setCharacteristics(false, initial_bitrate, hardwareFilters, canNumber, flowControls);// Todo: Added canNumber, monitor this one and make sure it works.
+            busWrapper.setCharacteristics(false, initial_bitrate, ids,masks);// Todo: Added canNumber, monitor this one and make sure it works.
             if (!busWrapper.start(BUS_NAME, busReadyReadWriteCallback, null)) {
                 Log.e(TAG, "Error starting bus with bus wrapper.");
                 return false;
@@ -144,7 +145,7 @@ public class VehicleBusCAN {
             // put our sockets in read-only mode
             clearConfirmedBitRate(); // erase any prior confirmations of bitrate
             clearConfirmedCanNumber();
-            busWrapper.setCharacteristics(true, initial_bitrate, hardwareFilters, canNumber, flowControls);
+            busWrapper.setCharacteristics(true, initial_bitrate, ids,masks);
             if (!busWrapper.start(BUS_NAME, busReadyReadOnlyCallback, null)) {
                 Log.e(TAG, "Error starting bus with bus wrapper.");
                 return false;
@@ -252,7 +253,7 @@ public class VehicleBusCAN {
     ///////////////////////////////////////////////////////////
     boolean startReading() {
 
-        VehicleBusWrapper.CANSocket canSocket = null;
+        CanSocket canSocket = null;
 
         canSocket = busWrapper.getCANSocket();
 
@@ -280,9 +281,7 @@ public class VehicleBusCAN {
     ///////////////////////////////////////////////////////////
     boolean startWriting() {
 
-        VehicleBusWrapper.CANSocket canSocket = null;
-
-        canSocket = busWrapper.getCANSocket();
+        CanSocket canSocket = busWrapper.getCANSocket();
 
         if ( canSocket == null) return false;
 
@@ -344,16 +343,6 @@ public class VehicleBusCAN {
         return busWrapper.getCANBitrate();
     }
 
-    public int getCanNumber() {
-        if (busWrapper != null) {
-            VehicleBusHW.CANSocket socket = busWrapper.getCANSocket();
-            if (socket != null) {
-                return socket.canNumber;
-            }
-        }
-        return -1;
-    }
-
 
 
     ///////////////////////////////////////////////////////////////////
@@ -391,21 +380,6 @@ public class VehicleBusCAN {
 
         state.writeState(State.CAN_CONFIRMED_BITRATE, confirmedBusBitrate ); // this is our discovered bitrate
     }
-
-    /**
-     * setConfirmedCanNumber()
-     *  sets the canNumber as confirmed, so we don't need to start in listening mode next time.
-     * **/
-    void setConfirmedCanNumber(int canNumber){
-        confirmedCanNumber = canNumber;
-
-        Log.v(TAG, "CAN Number " + confirmedCanNumber + " is confirmed");
-        State state;
-        state = new State(context);
-
-        state.writeState(State.CAN_CONFIRMED_NUMBER, confirmedCanNumber);
-    }
-
 
     ///////////////////////////////////////////////////////////////////
     // clearConfirmedBitRate()
@@ -471,7 +445,7 @@ public class VehicleBusCAN {
     ///////////////////////////////////////////////////////////////////
     // receiveFrame() : called by CAN thread when something is received
     ///////////////////////////////////////////////////////////////////
-    void receiveFrame(VehicleBusWrapper.CANFrame frame) {
+    void receiveFrame(CanFrame frame) {
 
 
         // Are we unconfirmed ?
@@ -504,7 +478,7 @@ public class VehicleBusCAN {
     // sendFrame() : safe to call from a different thread than the CAN threads
     //  queues a frame to be sent by the write thread
     ///////////////////////////////////////////////////////////////////
-    void sendFrame(VehicleBusWrapper.CANFrame frame) {
+    void sendFrame(CanFrame frame) {
 
         Log.vv(TAG, "SendFrame()");
         synchronized (outgoingList) {
@@ -546,17 +520,15 @@ public class VehicleBusCAN {
         volatile boolean cancelThread = false;
         volatile boolean isClosed = false;
         volatile boolean isReady = false;
-        //CanbusInterface canInterface;
-        VehicleBusWrapper.CANSocket canWriteSocket;
+        CanSocket canWriteSocket;
 
-        CANWriteRunnable(VehicleBusWrapper.CANSocket socket) {
-//                CanbusInterface new_canInterface) {
+        CANWriteRunnable(CanSocket socket) {
             canWriteSocket = socket;
         }
 
         public void run() {
 
-            VehicleBusWrapper.CANFrame outFrame = null;
+            CanFrame outFrame = null;
 
             while (!cancelThread) {
 
@@ -627,9 +599,9 @@ public class VehicleBusCAN {
         volatile boolean isReady = false;
 
         //CanbusInterface canInterface;
-        VehicleBusWrapper.CANSocket canReadSocket;
+        CanSocket canReadSocket;
 
-        CANReadRunnable(VehicleBusWrapper.CANSocket new_canSocket) {
+        CANReadRunnable(CanSocket new_canSocket) {
 //            CanbusInterface new_canInterface) {
             //canInterface = new_canInterface;
             canReadSocket = new_canSocket;
@@ -646,7 +618,7 @@ public class VehicleBusCAN {
                 }
 
 
-                VehicleBusWrapper.CANFrame inFrame = null;
+                CanFrame inFrame = null;
 
 
                 if (!cancelThread) {
@@ -703,7 +675,7 @@ public class VehicleBusCAN {
     // broadcastRx()
     //  send a local broadcast that we received a CAN frame from the bus
     ///////////////////////////////////////////////
-    void broadcastRx(VehicleBusWrapper.CANFrame frame) {
+    void broadcastRx(CanFrame frame) {
 
 
 
@@ -758,7 +730,7 @@ public class VehicleBusCAN {
                 byte[] data = intent.getByteArrayExtra(VehicleBusConstants.BROADCAST_EXTRA_CAN_DATA);
 
                 if ((id != -1) && (data != null) && (data.length > 0)) {
-                    VehicleBusWrapper.CANFrame frame = new VehicleBusWrapper.CANFrame(id, data, VehicleBusWrapper.CANFrameType.EXTENDED);
+                    CanFrame frame = new CanFrame(id, data);
                     sendFrame(frame);
                 }
             } catch (Exception e) {

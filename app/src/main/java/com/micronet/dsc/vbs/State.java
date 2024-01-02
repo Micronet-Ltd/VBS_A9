@@ -7,13 +7,8 @@ package com.micronet.dsc.vbs;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.text.TextUtils;
 
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * State contains saved state information flags.
@@ -113,41 +108,6 @@ public class State {
         }
 
         return true;
-    }
-
-    /**
-     * Writes a Flow Control Array for the given state setting. Returns true if successful, else false.
-     */
-    public boolean writeStateFlowControls(final ArrayList<VehicleBusHW.CANFlowControl> flowControls) {
-        try {
-            SharedPreferences.Editor editor = sharedPref.edit();
-            if (flowControls == null) {
-                editor.putString(Integer.toString(CAN_FLOW_CONTROLS), "");
-            } else {
-                String objStr = gson.toJson(flowControls);
-                editor.putString(Integer.toString(CAN_FLOW_CONTROLS), objStr);
-            }
-
-            editor.commit();
-        } catch (Exception e) {
-            Log.e(TAG, "Exception: writeStateFlowControls() " + e, e);
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Returns an String value for the given state. If state doesn't exist, returns "".
-     */
-    public ArrayList<VehicleBusHW.CANFlowControl> readStateFlowControls() {
-        String jsonStr = sharedPref.getString(Integer.toString(CAN_FLOW_CONTROLS), "");
-
-        if (!TextUtils.isEmpty(jsonStr)) {
-            return gson.fromJson(jsonStr, new TypeToken<List<VehicleBusHW.CANFlowControl>>(){}.getType());
-        } else {
-            return null;
-        }
     }
 
     /**
