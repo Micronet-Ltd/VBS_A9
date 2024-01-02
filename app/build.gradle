@@ -1,6 +1,13 @@
-apply plugin: 'com.android.application'
+//apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application'
+}
 
 android {
+    namespace = 'com.micronet.dsc.vbs.TXRX'
+    buildFeatures{
+        buildConfig = true
+    }
     signingConfigs {
         tab8keys
         obc5keys
@@ -36,7 +43,7 @@ android {
             buildConfigField "String", "ATS_ID_SUFFIX", '".tab8"'  // for talking to ATS
             minSdkVersion 28
             targetSdkVersion 28
-            signingConfig signingConfigs.tab8keys
+//            signingConfig signingConfigs.tab8keys
         }
         obc5 {
             dimension "device"
@@ -47,7 +54,7 @@ android {
             buildConfigField "String", "ATS_ID_SUFFIX", '".obc5"' // for talking to ATS
             minSdkVersion 28
             targetSdkVersion 28
-            signingConfig signingConfigs.obc5keys
+//            signingConfig signingConfigs.obc5keys
             dependencies {
                 implementation fileTree(dir: 'obc5/jniLibs', include: ['.so'])
             }
@@ -77,16 +84,16 @@ dependencies {
     implementation 'com.android.support:appcompat-v7:28.0.0'
 }
 
-def tab8_props = new Properties()
-tab8_props.load(new FileInputStream(rootProject.file("tab8keys.properties")))
-android.signingConfigs.tab8keys.storeFile rootProject.file(tab8_props.keyStore)
-android.signingConfigs.tab8keys.storePassword tab8_props.keyStorePassword
-android.signingConfigs.tab8keys.keyAlias tab8_props.keyAlias
-android.signingConfigs.tab8keys.keyPassword tab8_props.keyAliasPassword
-
-def obc5_props = new Properties()
-obc5_props.load(new FileInputStream(rootProject.file("obc5keys.properties")))
-android.signingConfigs.obc5keys.storeFile rootProject.file(obc5_props.keyStore)
-android.signingConfigs.obc5keys.storePassword obc5_props.keyStorePassword
-android.signingConfigs.obc5keys.keyAlias obc5_props.keyAlias
-android.signingConfigs.obc5keys.keyPassword obc5_props.keyAliasPassword
+//def tab8_props = new Properties()
+//tab8_props.load(new FileInputStream(rootProject.file("tab8keys.properties")))
+//android.signingConfigs.tab8keys.storeFile rootProject.file(tab8_props.keyStore)
+//android.signingConfigs.tab8keys.storePassword tab8_props.keyStorePassword
+//android.signingConfigs.tab8keys.keyAlias tab8_props.keyAlias
+//android.signingConfigs.tab8keys.keyPassword tab8_props.keyAliasPassword
+//
+//def obc5_props = new Properties()
+//obc5_props.load(new FileInputStream(rootProject.file("obc5keys.properties")))
+//android.signingConfigs.obc5keys.storeFile rootProject.file(obc5_props.keyStore)
+//android.signingConfigs.obc5keys.storePassword obc5_props.keyStorePassword
+//android.signingConfigs.obc5keys.keyAlias obc5_props.keyAlias
+//android.signingConfigs.obc5keys.keyPassword obc5_props.keyAliasPassword
