@@ -1,5 +1,5 @@
 # VBS Service
-VBS -- Vehicle Bus Service (talks to the CAN and J1708 buses and forwards this info to ATS)
+VBS -- Vehicle Bus Service (talks to the CAN and forwards the info to ATS)
 
 These projects require the correct system signing keys. Different hardware platforms have different keys. Sample files are included for you to copy and edit so they point to the correct keys.
 

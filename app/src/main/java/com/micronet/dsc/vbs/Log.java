@@ -18,7 +18,7 @@ public class Log {
 
     // Info, Warnings, and Errors are always recorded.
 
-    //public static String logTags[] = {"ATS-Service", "ATS-Power", "ATS-Queue", "ATS-Engine", "ATS-J1939", "ATS-CAN", "ATS-J1587", "ATS-J1708"};
+    //public static String logTags[] = {"ATS-Service", "ATS-Power", "ATS-Queue", "ATS-Engine", "ATS-J1939", "ATS-CAN", "ATS-J1587"};
     public static String logTags[] = {"*"};
 
     public static LogCallbackInterface callbackInterface;

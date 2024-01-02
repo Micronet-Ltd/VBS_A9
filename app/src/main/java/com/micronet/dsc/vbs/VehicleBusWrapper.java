@@ -5,8 +5,8 @@
 
 /////////////////////////////////////////////////////////////
 // VehicleBusWrapper:
-//  1) Extension: provides extra methods that can are used by both J1708 and CAN sub-classes
-//  2) Resource Sharing: allows setup of the singleton interfaces and sockets needed for joint access to can library by CAN and J1708
+//  1) Extension: provides extra methods that can be used by CAN sub-classes
+//  2) Resource Sharing: allows setup of the singleton interfaces and sockets needed for joint access to can library by CAN
 //  3) Normalization: Provides intermediate layer for access to library so no other classes call library methods directly.
 /////////////////////////////////////////////////////////////
 
@@ -87,23 +87,6 @@ public class VehicleBusWrapper extends VehicleBusHW {
     ///////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////
 
-
-    //////////////////////////////////////////////////////////////////
-    // isJ1708Supported()
-    //  does the hardware support J1708 ?
-    //////////////////////////////////////////////////////////////////
-    public static boolean isJ1708Supported() {
-        Log.v(TAG, "Testing isJ1708Supported?");
-        if (!isUnitTesting) {
-            return VehicleBusHW.isJ1708Supported();
-        } else {
-            return true;
-        }
-
-    }
-
-
-
     //////////////////////////////////////////////////
     // setCharacteristics()
     //  set details for the CAN, call this before starting a CAN bus
@@ -131,7 +114,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
     //////////////////////////////////////////////////
     // start()
     //   startup a bus
-    //   name: either "J1708" or "CAN"
+    //   name: "CAN"
     //////////////////////////////////////////////////
     public boolean start(String name, Runnable readyCallback, Runnable terminatedCallback) {
 
@@ -169,16 +152,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
 
 
         if (busSetupRunnable.isSetup()) {
-            // If we are adding J1708 to CAN, we can re-use the existing socket
-            if (name.equals("J1708")) {
-                // call this right away and return
-                Log.v(TAG, "piggybacking J1708 on existing CAN socket");
-                callbackHandler.post(readyCallback);
-                return true;
-            }
-            // IF we are adding CAN to J1708, we must shutdown and restart
             busSetupRunnable.teardown();
-
         }
 
         //String names = "";
@@ -187,29 +161,19 @@ public class VehicleBusWrapper extends VehicleBusHW {
         //}
         //Log.v(TAG, "Names open = " + names);
 
-
-        // if we are starting J1708 and we haven't started CAN, we need to set CAN to listen-only
-
-        if (name.equals("J1708")) { // we are starting J1708
-            if (!instanceNames.contains("CAN")) { // CAN was not started
-                busSetupRunnable.setDefaultCharacteristics(); // this puts us in listen mode and also filters out all rx CAN packets
-            }
+        if (!instanceNames.contains("CAN")) { // CAN was not started
+            busSetupRunnable.setDefaultCharacteristics(); // this puts us in listen mode and also filters out all rx CAN packets
         }
 
         // since we haven't already, we should set-up now
-        if (!busSetupRunnable.setup()) {
-            return false;
-        }
-
-
-        return true;
+        return busSetupRunnable.setup();
     } // start()
 
 
     //////////////////////////////////////////////////
     // stop()
     //  stop a bus
-    //   name: either "J1708" or "CAN"
+    //   name: "CAN"
     //////////////////////////////////////////////////
     public void stop(String name) {
 
@@ -273,10 +237,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
 
     //////////////////////////////////////////////////
     // restart()
-    //  restarts the buses
-    //  used for changing the speed or mode of CAN without having to start/stop J1708 twice (once to remove CAN and once to re-add CAN)
-    //      using this call, J1708 is only restarted once when CAN is changed.
-    //   name: "CAN"
+    //  restarts the bus
     //////////////////////////////////////////////////
     public boolean restart(String replaceCallbacksName,
                            Runnable newReadyCallback,
@@ -325,17 +286,6 @@ public class VehicleBusWrapper extends VehicleBusHW {
 
     } // restart()
 
-
-
-    ///////////////////////////////////////////////////
-    // getJ1708Socket()
-    //  return the socket that this wrapper created
-    ///////////////////////////////////////////////////
-    public J1708Socket getJ1708Socket() {
-        if (busSetupRunnable == null) return null; // never even created
-        if (!busSetupRunnable.isSetup()) return null; // no valid socket
-        return new J1708Socket(busSetupRunnable.setupSocket);
-    } // getJ1708Socket()
 
     ///////////////////////////////////////////////////
     // getCANSocket()
@@ -571,8 +521,7 @@ public class VehicleBusWrapper extends VehicleBusHW {
             Log.v(TAG, "opening socket");
 
             // we want to discard buffer when opening listen-only sockets because this means we
-            //      may be switching bitrates (unless we are only starting J1708, in which case only downside
-            //      is it takes 3 seconds longer than it otherwise would to start getting packets).
+            //      may be switching bit-rates.
 
             if (!openSocket(canNumber, setupSocket, listen_only)) {
                 removeInterface(canNumber, setupInterface);

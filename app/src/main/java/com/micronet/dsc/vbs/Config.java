@@ -55,7 +55,7 @@ public class Config {
         return null;
     }
 
-    // Can be CAN1, CAN2, or J1708
+    // Can be CAN1 or CAN2
     private static PortConfig getPortConfig(String port) {
         // Read current config file
         readConfigFile();

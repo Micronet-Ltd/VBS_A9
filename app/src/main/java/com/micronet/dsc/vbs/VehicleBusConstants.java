@@ -14,10 +14,7 @@ public final class VehicleBusConstants {
     // Packages and Permissions
     //////////////////////////////////////
 
-    public static final String PACKAGE_NAME_VBS = "com.micronet.dsc.vbs";
     public static final String PACKAGE_NAME_ATS = "com.micronet.dsc.ats";
-
-    public static final String PERMISSION_VBS_TXRX = "com.micronet.dsc.vbs.TXRX";
 
     //////////////////////////////////////
     // Actions for VBS service
@@ -25,14 +22,14 @@ public final class VehicleBusConstants {
 
     public static final String SERVICE_ACTION_ALARM = "com.micronet.dsc.vbs.alarm"; // deprecated
 
-    // Action : START : start up a particular bus (either J1708 or CAN)
+    // Action : START : start up CAN
     public static final String SERVICE_ACTION_START = "com.micronet.dsc.vbs.start";
 
     // Action : RESTART : restart all buses that were running with the same parameters they were running with
     //  This is useful when VBS crashes
     public static final String SERVICE_ACTION_RESTART = "com.micronet.dsc.vbs.restart";
 
-    // Action: STOP : STOP a particular bus (either J1708 or CAN)
+    // Action: STOP : STOP CAN
     public static final String SERVICE_ACTION_STOP = "com.micronet.dsc.vbs.stop";
 
 
@@ -40,8 +37,8 @@ public final class VehicleBusConstants {
     // Extras for the VBS service
     //////////////////////////////////////
 
-    // Extra: "bus" (String): Defines the bus type you are acting on. May be "CAN" or "J1708"
-    //      use with START, RESTART, and STOP Actions
+    // Extra: "bus" (String): Defines the bus type you are acting on.
+    //        Use with START, RESTART, and STOP Actions
     public static final String SERVICE_EXTRA_BUS = "bus";
 
     // Extra: "bitrate" (int): Defines the initial CAN bitrate. May be 250000 or 500000
@@ -84,12 +81,6 @@ public final class VehicleBusConstants {
     // Broadcast: cantx : broadcast this to ask VBS to transmit a CAN packet on the bus
     public static final String BROADCAST_CAN_TX = "com.micronet.dsc.vbs.cantx";
 
-    // Broadcast: j1708rx : contains a Received J1708 packet from the bus
-    public static final String BROADCAST_J1708_RX = "com.micronet.dsc.vbs.j1708rx";
-
-    // Broadcast: j1708tx : broadcast this to ask VBS to transmit a J1708 packet on the bus
-    public static final String BROADCAST_J1708_TX = "com.micronet.dsc.vbs.j1708tx";
-
     // Broadcast: status : sent regularly by VBS with the status of the buses. Useful for telling if VBS crashed
     public static final String BROADCAST_STATUS = "com.micronet.dsc.vbs.status";
 
@@ -105,10 +96,6 @@ public final class VehicleBusConstants {
     public static final String BROADCAST_EXTRA_STATUS_CANBITRATE ="canBitrate";
     // Extra "canNumber" (int): what is the can number?
     public static final String BROADCAST_EXTRA_STATUS_CANNUMBER ="canNumber";
-    // Extra "j1708rx" (boolean): are we able to receive on J1708 yet?
-    public static final String BROADCAST_EXTRA_STATUS_J1708RX ="j1708rx";
-    // Extra "j1708tx" (boolean): are we able to transmit on J1708 yet?
-    public static final String BROADCAST_EXTRA_STATUS_J1708TX = "j1708tx";
 
 
     // Extra "elapsedRealtime" (long): contains the time that VBS received the packet
@@ -119,10 +106,4 @@ public final class VehicleBusConstants {
     // Extra "data" (byte array): Contains the data for the frame rx/tx
     public static final String BROADCAST_EXTRA_CAN_DATA ="data";
 
-    // Extra "id" (int): Contains the frame ID to rx/tx
-    public static final String BROADCAST_EXTRA_J1708_ID = "id";
-    // Extra "data" (byte array): Contains the data for the frame rx/tx
-    public static final String BROADCAST_EXTRA_J1708_DATA = "data";
-    // Extra "priority" (int): Contains a priority for this frame rx/tx
-    public static final String BROADCAST_EXTRA_J1708_PRIORITY = "priority";
 }

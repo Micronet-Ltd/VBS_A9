@@ -34,7 +34,6 @@ public class State {
     public static final int CAN_CONFIRMED_BITRATE = 207;    // prior bitrate that was confirmed (so we don't need listen only)
     public static final int CAN_CONFIRMED_NUMBER = 208;
     public static final int CAN_NUMBER = 209;
-    public static final int FLAG_J1708_ON = 210;
     public static final int CAN_FLOW_CONTROLS = 211;
 
     Context context;
